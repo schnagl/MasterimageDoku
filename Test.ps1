@@ -1,3 +1,3 @@
-Version 0.1
+$eVersion = "2.05"
 
 write-output "Hello World"
