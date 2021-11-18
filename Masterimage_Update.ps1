@@ -10,7 +10,7 @@ Please add the OrgID of the Organissation to the Script.
 
 .NOTES
 Masterimage Script
-Version: 0.10
+Version: 0.11
 Company: EDV-BV
 Author: Christian Schnagl 
 Creation Date: 2021-11-18
@@ -32,9 +32,10 @@ Changelog:
     )
 
 
-    ########################### ITGlue Infos ###########################
+    ########################### Basic Infos ###########################
     $ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
+    $ScriptVersion = "0.11"
 
     
 
@@ -352,13 +353,13 @@ function Set-SealingDate{
 
 function Get-NewVersion{
   param(
-    [String]$PathExistingVersion = "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/Test.ps1"
+    [String]$PathExistingVersion = "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/Masterimage_Update.ps1"
   )
   $WebResponseVersion = Invoke-WebRequest -UseBasicParsing $PathExistingVersion
   If (!$WebVersion) {
       $WebVersion = (($WebResponseVersion.tostring() -split "[`r`n]" | select-string "Version:" | Select-Object -First 1) -split ":")[1].Trim()
   }
-  If ($WebVersion -gt $eVersion) {
+  If ($WebVersion -gt $ScriptVersion) {
       $NewerVersion = $true
   }
   else{
@@ -403,14 +404,13 @@ $Form.BackColor          = "#ffffff"
 $Form.TopMost            = $false
 $Icon                    = New-Object system.drawing.icon ("C:\Users\christian.schnagl\Downloads\edvbv.ico")
 $Form.Icon               = $Icon
-$Form.Visible            = $false
 
 $Script:ChangesSoftware  = Get-Changes-Software
 $Script:ChangesPatches   = Get-Changes-Patches
 #Get-Changes
 
-Set-Label -Text "Aktualisierung Masterimage" -CLine 20 -Height 10 -Fontsize 20 -Bold
-Set-Label -Text "Automatische Dokumentation der Updates und Changes am Masterimage" -CLine 60 -Height 50 -Fontsize 10
+$LabelLine = Set-Label -Text "Aktualisierung Masterimage" -CLine 20 -Height 10 -Fontsize 20 -Bold
+$LabelLine = Set-Label -Text "Automatische Dokumentation der Updates und Changes am Masterimage" -CLine 60 -Height 50 -Fontsize 10
 
 $LabelLine = 120
 $LabelLine = Set-Label -Text "Firma" -CLine $LabelLine -Height 10 -Fontsize 10
@@ -451,7 +451,6 @@ $acceptBtn.height                = 30
 $acceptBtn.location              = New-Object System.Drawing.Point(280,720)
 $acceptBtn.Font                  = 'Microsoft Sans Serif,10'
 $acceptBtn.ForeColor             = "#000"
-#$acceptBtn.DialogResult          = [System.Windows.Forms.DialogResult]::OK
 $Form.AcceptButton   = $acceptBtn
 $Form.Controls.Add($acceptBtn)
 
@@ -550,11 +549,13 @@ $GridViewPatches = New-Object System.Windows.Forms.DataGridView -Property @{
 $form.Controls.Add($GridViewPatches)
 
 
-
 #endregion Forms
 #---------------------------------------------------------[Script Write]--------------------------------------------------------
 if(Get-NewVersion){
-  write-Host "New Version"
+  write-Host "Versioncheck - New Version Available" -ForegroundColor Red
+}
+else{
+  write-Host "Versioncheck - Version Up2Date" -ForegroundColor Green
 }
 
 [void]$Form.ShowDialog()
