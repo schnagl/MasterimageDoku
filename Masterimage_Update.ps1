@@ -362,11 +362,31 @@ function Get-NewVersion{
   If ($WebVersion -gt $ScriptVersion) {
       $NewerVersion = $true
   }
-  else{
-      $NewerVersion = $false
+
+  If ($NewerVersion -eq $false) {
+    # No new version available
+    write-Host "Versioncheck - Version Up2Date" -ForegroundColor Green
+    Write-Output ""
   }
- 
-  return $NewerVersion
+  Else {
+    # There is a new Script Version
+    write-Host "Versioncheck - New Version Available" -ForegroundColor Red
+    Write-Output ""
+
+    $wshell = New-Object -ComObject Wscript.Shell
+    $AnswerPending = $wshell.Popup("Do you want to download the new version?",0,"New Version Alert!",32+4)
+    If ($AnswerPending -eq "6") {
+        $update = @'
+            Remove-Item -Path "$PSScriptRoot\Masterimage_Update.ps1" -Force 
+            Invoke-WebRequest -Uri $PathExistingVersion -OutFile ("$PSScriptRoot\" + "Masterimage_Update.ps1")
+            & "$PSScriptRoot\Masterimage_Update.ps1"
+'@
+        $update > $PSScriptRoot\MasterimageScriptUpdater.ps1
+        & "$PSScriptRoot\MasterimageScriptUpdater.ps1"
+        Break
+    }
+    
+  }
 }
 
 
@@ -551,11 +571,6 @@ $form.Controls.Add($GridViewPatches)
 
 #endregion Forms
 #---------------------------------------------------------[Script Write]--------------------------------------------------------
-if(Get-NewVersion){
-  write-Host "Versioncheck - New Version Available" -ForegroundColor Red
-}
-else{
-  write-Host "Versioncheck - Version Up2Date" -ForegroundColor Green
-}
+
 
 [void]$Form.ShowDialog()
