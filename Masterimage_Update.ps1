@@ -10,7 +10,7 @@ Please add the OrgID of the Organissation to the Script.
 
 .NOTES
 Masterimage Script
-Version: 0.11
+Version: 0.12
 Company: EDV-BV
 Author: Christian Schnagl 
 Creation Date: 2021-11-18
