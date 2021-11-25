@@ -10,7 +10,6 @@ Please add the OrgID of the Organissation to the Script.
 
 .NOTES
 Masterimage Script
-Version: 0.20
 Company: EDV-BV
 Author: Christian Schnagl 
 Creation Date: 2021-11-18
@@ -39,7 +38,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "0.20"
+    $ScriptVersion = "0.80"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
@@ -199,7 +198,8 @@ Add-Type -AssemblyName System.Drawing
     }
     $WebResponseVersion = Invoke-WebRequest -UseBasicParsing $PathExistingVersion
     If (!$WebVersion) {
-        $WebVersion = (($WebResponseVersion.tostring() -split "[`r`n]" | select-string "Version:" | Select-Object -First 1) -split ":")[1].Trim()
+        $WebVersion = (($WebResponseVersion.tostring() -split "[`r`n]" | select-string "ScriptVersion =" | Select-Object -First 1) -split "=")[1].Trim()
+        $WebVersion = $WebVersion.Replace('"','')
     }
     If ($WebVersion -gt $ScriptVersion) {
         $NewerVersion = $true
@@ -221,6 +221,7 @@ Add-Type -AssemblyName System.Drawing
       $wshell = New-Object -ComObject Wscript.Shell
       $AnswerPending = $wshell.Popup("Do you want to download the new version?",0,"New Version Alert!",32+4)
       If ($AnswerPending -eq "6") {
+        Invoke-ProgramParts
           $update = @'
               Remove-Item -Path "$PSScriptRoot\ITGLUE_Masterimage.ps1" -Force 
               Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage.ps1" -OutFile ("$PSScriptRoot\" + "ITGLUE_Masterimage.ps1")
@@ -236,10 +237,10 @@ Add-Type -AssemblyName System.Drawing
     }
   }
   function Invoke-ProgramParts{
-    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_GUI.ps1" -Force 
-    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_FirstRunGUI.ps1" -Force 
-    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_EDVBV_ICON.ico" -Force 
-    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_EDVBV_LOGO.png" -Force 
+    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_GUI.ps1" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_FirstRunGUI.ps1" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$Script:InstallPath\EDVBV_ICON.ico" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$Script:InstallPath\EDVBV_LOGO.png" -Force -ErrorAction SilentlyContinue
 
     Write-Host "Creating new Directory"
     new-item -ItemType Directory -Force -Path $Script:InstallPath     
@@ -254,6 +255,40 @@ Add-Type -AssemblyName System.Drawing
     Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/EDVBV_ICON.ico" -OutFile ("$Script:InstallPath\" + "EDVBV_ICON.ico")
     Write-Host "Download Image"
     Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/EDVBV_LOGO.png" -OutFile ("$Script:InstallPath\" + "EDVBV_LOGO.png")
+  }
+  function set-Shortcut{
+    param ( 
+    [string]$TargetPath, 
+    [string]$DestinationPath,
+    [string]$Arguments,
+    [string]$IconLocation 
+    )
+
+    $WshShell = New-Object -comObject WScript.Shell
+    $Shortcut = $WshShell.CreateShortcut($DestinationPath)
+    $Shortcut.TargetPath = $SourceExe
+    $Shortcut.Arguments = $Arguments
+    $Shortcut.IconLocation = $IconLocation
+    $Shortcut.Save() 
+  }
+
+  function Set-BISF {
+    if(Test-Path "$Script:InstallPath\ITGLUE_Masterimage.ps1"){
+
+    }
+    else{
+      Write-Host "Adding Masterimage Script to " +$Script:InstallPath
+      Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage.ps1" -OutFile ("$Script:InstallPath\" + "ITGLUE_Masterimage.ps1")  
+    }
+    if(Test-Path "C:\Program Files (x86)\Base Image Script Framework (BIS-F)"){
+      write-Host "BISF exists - Creating Link"
+      set-Shortcut -TargetPath "powershell.exe" -DestinationPath "C:\Program Files (x86)\Base Image Script Framework (BIS-F)\Framework\SubCall\Preparation\Custom\Masterimage_Doku.lnk" -Arguments "& $Script:InstallPath\ITGLUE_Masterimage.ps1" -IconLocation "$Script:InstallPath\EDVBV_ICON.ico"
+    }
+    else{
+      write-Host "BISF does not exists"
+
+    }
+
   }
 #endregion
 #--------------------------------------------------------[Functions]--------------------------------------------------------
@@ -296,7 +331,7 @@ $Form1_Load = {
       $Costumers += $Item
       $ComboBoxFirma.items.add($Item)
     }
-    $ComboBoxFirma.SelectedItem = $Costumers[0]
+    #$ComboBoxFirma.SelectedItem = $Costumers[0]
 
 
     $ListSoftware = New-Object System.collections.ArrayList
@@ -334,18 +369,6 @@ $Form1_Load = {
 
 #---------------------------------------------------------[Script]---------------------------------------------------------
 #region Script
-Add-Type -AssemblyName System.Windows.Forms
-. (Join-Path $PSScriptRoot 'ITGLUE_Masterimage_GUI.ps1')
-. (Join-Path $PSScriptRoot 'ITGLUE_Masterimage_FirstRunGUI.ps1')
-
-
-$PictureBoxFirstRun.ImageLocation = $Script:InstallPath+"\EDVBV_LOGO.png" #ToDo Download
-$FormFirstRun.CancelButton        = $ButtonCancel
-$FormFirstRun.Icon                = New-Object system.drawing.icon ($Script:InstallPath+"\EDVBV_ICON.ico") #ToDo Download
-$PictureBox1.ImageLocation        = $Script:InstallPath+"\EDVBV_LOGO.png" #ToDo Download
-$FormA1.CancelButton              = $ButtonCancel
-$FormA1.Icon                      = New-Object system.drawing.icon ($Script:InstallPath+"\EDVBV_ICON.ico") #ToDo Download
-
 
 ## Check New Version
 Get-NewVersion
@@ -358,18 +381,31 @@ if($NULL -ne $LastPass){
   $LastPassDate = Get-Date $LastPassDate
   $Customers = $LastPass.Customers -split(",")
 
-  #Invoke-ProgramParts
+}
+else{
+  Invoke-ProgramParts
+  $LastPassDate = Get-Date "01.01.1900"
+}
+
+Add-Type -AssemblyName System.Windows.Forms
+. (Join-Path $Script:InstallPath '\ITGLUE_Masterimage_GUI.ps1')
+. (Join-Path $Script:InstallPath '\ITGLUE_Masterimage_FirstRunGUI.ps1')
+
+
+$PictureBoxFirstRun.ImageLocation = $Script:InstallPath+"\EDVBV_LOGO.png" #ToDo Download
+$FormFirstRun.CancelButton        = $ButtonCancel
+$FormFirstRun.Icon                = New-Object system.drawing.icon ($Script:InstallPath+"\EDVBV_ICON.ico") #ToDo Download
+$PictureBox1.ImageLocation        = $Script:InstallPath+"\EDVBV_LOGO.png" #ToDo Download
+$FormA1.CancelButton              = $ButtonCancel
+$FormA1.Icon                      = New-Object system.drawing.icon ($Script:InstallPath+"\EDVBV_ICON.ico") #ToDo Download
+
+if($NULL -ne $LastPass){
   ## Aufruf GUI
   $FormA1.ShowDialog()
 }
 else{
-  $LastPassDate = Get-Date "01.01.1900"
     ## Aufruf FirstRun
     $FormFirstRun.ShowDialog()
 }
-
-
-
-
 #endregion 
 #---------------------------------------------------------[Script]---------------------------------------------------------
