@@ -13,6 +13,8 @@ $FormFirstRun = New-Object -TypeName System.Windows.Forms.Form
 [System.Windows.Forms.TableLayoutPanel]$TableLayoutPanel1 = $null
 [System.Windows.Forms.TextBox]$TextBoxOrgID = $null
 [System.Windows.Forms.Label]$Label5 = $null
+[System.Windows.Forms.Label]$LabelWebhook = $null
+[System.Windows.Forms.TextBox]$TextBoxWebhook = $null
 [System.Windows.Forms.Label]$Label2 = $null
 [System.Windows.Forms.RichTextBox]$RichTextBoxCustomerInput = $null
 [System.Windows.Forms.Label]$Label4 = $null
@@ -35,6 +37,8 @@ $Label3 = (New-Object -TypeName System.Windows.Forms.Label)
 $TableLayoutPanel1 = (New-Object -TypeName System.Windows.Forms.TableLayoutPanel)
 $TextBoxOrgID = (New-Object -TypeName System.Windows.Forms.TextBox)
 $Label5 = (New-Object -TypeName System.Windows.Forms.Label)
+$LabelWebhook = (New-Object -TypeName System.Windows.Forms.Label)
+$TextBoxWebhook = (New-Object -TypeName System.Windows.Forms.TextBox)
 $Label2 = (New-Object -TypeName System.Windows.Forms.Label)
 $RichTextBoxCustomerInput = (New-Object -TypeName System.Windows.Forms.RichTextBox)
 $Label4 = (New-Object -TypeName System.Windows.Forms.Label)
@@ -163,13 +167,16 @@ $TableLayoutPanel1.ColumnStyles.Add((New-Object -TypeName System.Windows.Forms.C
 $TableLayoutPanel1.ColumnStyles.Add((New-Object -TypeName System.Windows.Forms.ColumnStyle -ArgumentList @([System.Windows.Forms.SizeType]::Percent,[System.Single]50)))
 $TableLayoutPanel1.Controls.Add($TextBoxOrgID,[System.Int32]1,[System.Int32]0)
 $TableLayoutPanel1.Controls.Add($Label5,[System.Int32]0,[System.Int32]0)
-$TableLayoutPanel1.Controls.Add($Label2,[System.Int32]0,[System.Int32]1)
-$TableLayoutPanel1.Controls.Add($RichTextBoxCustomerInput,[System.Int32]1,[System.Int32]1)
+$TableLayoutPanel1.Controls.Add($LabelWebhook,[System.Int32]0,[System.Int32]1)
+$TableLayoutPanel1.Controls.Add($TextBoxWebhook,[System.Int32]1,[System.Int32]1)
+$TableLayoutPanel1.Controls.Add($Label2,[System.Int32]0,[System.Int32]2)
+$TableLayoutPanel1.Controls.Add($RichTextBoxCustomerInput,[System.Int32]1,[System.Int32]2)
 $TableLayoutPanel1.Location = (New-Object -TypeName System.Drawing.Point -ArgumentList @([System.Int32]14,[System.Int32]430))
 $TableLayoutPanel1.Name = [System.String]'TableLayoutPanel1'
-$TableLayoutPanel1.RowCount = [System.Int32]2
-$TableLayoutPanel1.RowStyles.Add((New-Object -TypeName System.Windows.Forms.RowStyle -ArgumentList @([System.Windows.Forms.SizeType]::Percent,[System.Single]30.54902)))
-$TableLayoutPanel1.RowStyles.Add((New-Object -TypeName System.Windows.Forms.RowStyle -ArgumentList @([System.Windows.Forms.SizeType]::Percent,[System.Single]70.45098)))
+$TableLayoutPanel1.RowCount = [System.Int32]3
+$TableLayoutPanel1.RowStyles.Add((New-Object -TypeName System.Windows.Forms.RowStyle -ArgumentList @([System.Windows.Forms.SizeType]::Percent,[System.Single]20)))
+$TableLayoutPanel1.RowStyles.Add((New-Object -TypeName System.Windows.Forms.RowStyle -ArgumentList @([System.Windows.Forms.SizeType]::Percent,[System.Single]20)))
+$TableLayoutPanel1.RowStyles.Add((New-Object -TypeName System.Windows.Forms.RowStyle -ArgumentList @([System.Windows.Forms.SizeType]::Percent,[System.Single]60)))
 $TableLayoutPanel1.Size = (New-Object -TypeName System.Drawing.Size -ArgumentList @([System.Int32]504,[System.Int32]177))
 $TableLayoutPanel1.TabIndex = [System.Int32]12
 $TableLayoutPanel1.add_Paint($TableLayoutPanel1_Paint)
@@ -190,6 +197,23 @@ $Label5.Size = (New-Object -TypeName System.Drawing.Size -ArgumentList @([System
 $Label5.TabIndex = [System.Int32]0
 $Label5.Text = [System.String]'ITGLUE Organisation ID'
 $Label5.UseCompatibleTextRendering = $true
+#
+#TextBoxWebhook
+#
+$TextBoxWebhook.Location = (New-Object -TypeName System.Drawing.Point -ArgumentList @([System.Int32]255,[System.Int32]3))
+$TextBoxWebhook.Name = [System.String]'TextBoxWebhook'
+$TextBoxWebhook.Size = (New-Object -TypeName System.Drawing.Size -ArgumentList @([System.Int32]246,[System.Int32]21))
+$TextBoxWebhook.TabIndex = [System.Int32]13
+#
+#LabelWebhook
+#
+$LabelWebhook.Font = (New-Object -TypeName System.Drawing.Font -ArgumentList @([System.String]'Segoe UI',[System.Single]12,[System.Drawing.FontStyle]::Regular,[System.Drawing.GraphicsUnit]::Point,([System.Byte][System.Byte]0)))
+$LabelWebhook.Location = (New-Object -TypeName System.Drawing.Point -ArgumentList @([System.Int32]3,[System.Int32]0))
+$LabelWebhook.Name = [System.String]'LabelWebhook'
+$LabelWebhook.Size = (New-Object -TypeName System.Drawing.Size -ArgumentList @([System.Int32]243,[System.Int32]39))
+$LabelWebhook.TabIndex = [System.Int32]0
+$LabelWebhook.Text = [System.String]'Webhook URL'
+$LabelWebhook.UseCompatibleTextRendering = $true
 #
 #Label2
 #
@@ -311,7 +335,9 @@ Add-Member -InputObject $FormFirstRun -Name Control5 -Value $Control5 -MemberTyp
 Add-Member -InputObject $FormFirstRun -Name Label3 -Value $Label3 -MemberType NoteProperty
 Add-Member -InputObject $FormFirstRun -Name TableLayoutPanel1 -Value $TableLayoutPanel1 -MemberType NoteProperty
 Add-Member -InputObject $FormFirstRun -Name TextBoxOrgID -Value $TextBoxOrgID -MemberType NoteProperty
+Add-Member -InputObject $FormFirstRun -Name TextBoxWebhook -Value $TextBoxWebhook -MemberType NoteProperty
 Add-Member -InputObject $FormFirstRun -Name Label5 -Value $Label5 -MemberType NoteProperty
+Add-Member -InputObject $FormFirstRun -Name LabelWebhook -Value $LabelWebhook -MemberType NoteProperty
 Add-Member -InputObject $FormFirstRun -Name Label2 -Value $Label2 -MemberType NoteProperty
 Add-Member -InputObject $FormFirstRun -Name RichTextBoxCustomerInput -Value $RichTextBoxCustomerInput -MemberType NoteProperty
 Add-Member -InputObject $FormFirstRun -Name Label4 -Value $Label4 -MemberType NoteProperty
