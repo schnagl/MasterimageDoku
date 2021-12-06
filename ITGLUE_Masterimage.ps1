@@ -38,7 +38,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "0.80"
+    $ScriptVersion = "0.82"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
@@ -70,7 +70,7 @@ Add-Type -AssemblyName System.Drawing
     )
   
     Write-Host "Sending to Webhook"
-    $WebhookURL = 'https://1c526335-77da-4dac-ba6c-295357be5a2e.webhook.dewc.azure-automation.net/webhooks?token=LQXUOUW2deeCwALqx9v9bUzxoNjVoraMd9aLkQte4IY%3d'
+    #$WebhookURL = 'https://1c526335-77da-4dac-ba6c-295357be5a2e.webhook.dewc.azure-automation.net/webhooks?token=LQXUOUW2deeCwALqx9v9bUzxoNjVoraMd9aLkQte4IY%3d'
     $UploadJSON = ConvertTo-Json -InputObject $FlexAssetBody
     $header = @{ 
       ITGlueOrgID   = $ITGlueOrgID 
@@ -78,7 +78,7 @@ Add-Type -AssemblyName System.Drawing
       FieldName    = $FieldName      
     }
     write-host $Host
-    $response = Invoke-RestMethod -Method post -Uri $WebhookURL -Body $UploadJSON -Headers $header
+    $response = Invoke-RestMethod -Method post -Uri $Script:WebhookURL -Body $UploadJSON -Headers $header
   
   }
   function Get-Changes-Software{
@@ -191,7 +191,7 @@ Add-Type -AssemblyName System.Drawing
   }
   function Get-NewVersion{
     param(
-      [String]$PathExistingVersion = "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/Masterimage_Update.ps1"
+      [String]$PathExistingVersion = "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage.ps1"
     )
     If (Test-Path "$PSScriptRoot\MasterimageScriptUpdater.ps1" -PathType leaf) {
       Remove-Item -Path "$PSScriptRoot\MasterimageScriptUpdater.ps1" -Force
@@ -272,7 +272,7 @@ Add-Type -AssemblyName System.Drawing
     $Shortcut.Save() 
   }
 
-  function Set-BISF {
+  function Set-BISFLink {
     if(Test-Path "$Script:InstallPath\ITGLUE_Masterimage.ps1"){
 
     }
@@ -297,8 +297,8 @@ Add-Type -AssemblyName System.Drawing
 #region Action Definitions
 $ButtonSave_Click = {
   $Script:ITGlueOrgID = $TextBoxOrgID.text
+  $Script:WebhookURL = $TextBoxWebhook.text
   $Customers = $RichTextBoxCustomerInput.Lines
-
   write-host "ORGID:" + $Script:ITGlueOrgID
 
   $FormFirstRun.Close()
@@ -311,6 +311,7 @@ $ButtonUpload_Click = {
   
   $FormA1.Close()
   Set-PassInfo
+  Set-BISFLink
 }
 $ButtonCancel_Click ={
 }
@@ -380,7 +381,7 @@ if($NULL -ne $LastPass){
   $LastPassDate = $LastPass.PassDate
   $LastPassDate = Get-Date $LastPassDate
   $Customers = $LastPass.Customers -split(",")
-
+  $Script:WebhookURL = $LastPass.WebhookURL
 }
 else{
   Invoke-ProgramParts
