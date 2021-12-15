@@ -299,6 +299,7 @@ $Label7.UseCompatibleTextRendering = $true
 $FormFirstRun.BackColor = [System.Drawing.SystemColors]::ControlLightLight
 $FormFirstRun.CancelButton = $ButtonCancel
 $FormFirstRun.ClientSize = (New-Object -TypeName System.Drawing.Size -ArgumentList @([System.Int32]746,[System.Int32]900))
+$FormFirstRun.AutoScroll = $true
 $FormFirstRun.Controls.Add($TableLayoutPanel1)
 $FormFirstRun.Controls.Add($Label8)
 $FormFirstRun.Controls.Add($ButtonSave)

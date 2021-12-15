@@ -413,6 +413,7 @@ $DataGridViewRegistry.TabIndex = [System.Int32]0
 #
 $FormA1.BackColor = [System.Drawing.SystemColors]::ControlLightLight
 $FormA1.ClientSize = (New-Object -TypeName System.Drawing.Size -ArgumentList @([System.Int32]746,[System.Int32]900))
+$FormA1.AutoScroll = $true
 $FormA1.Controls.Add($LabelCopyright)
 $FormA1.Controls.Add($ButtonUpload)
 $FormA1.Controls.Add($TabControl)

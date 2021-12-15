@@ -16,6 +16,9 @@ Creation Date: 2021-11-18
 ####
 
 Changelog:
+2021-12-15    WEBHook-ULR entfernt
+2021-12-14    AutoScroll GUI + FirstRunGui hinzugefügt
+2021-12-06    WebhookURL Ausgelagert & BIS-F Script
 2021-11-25    First Run & Anpassungen Upload
 2021-11-23    Neues GUI
 2021-11-20    First Run
@@ -38,7 +41,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "0.82"
+    $ScriptVersion = "0.84"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
@@ -70,7 +73,6 @@ Add-Type -AssemblyName System.Drawing
     )
   
     Write-Host "Sending to Webhook"
-    #$WebhookURL = 'https://1c526335-77da-4dac-ba6c-295357be5a2e.webhook.dewc.azure-automation.net/webhooks?token=LQXUOUW2deeCwALqx9v9bUzxoNjVoraMd9aLkQte4IY%3d'
     $UploadJSON = ConvertTo-Json -InputObject $FlexAssetBody
     $header = @{ 
       ITGlueOrgID   = $ITGlueOrgID 
@@ -186,6 +188,7 @@ Add-Type -AssemblyName System.Drawing
     $Info | Add-Member -type NoteProperty -name "PassDate" -Value $CurDate
     $Info | Add-Member -type NoteProperty -name "ITGlueOrgID" -Value $Script:ITGlueOrgID
     $Info | Add-Member -type NoteProperty -name "Customers" -Value  $CustomersString
+    $Info | Add-Member -type NoteProperty -name "WebhookURL" -Value  $Script:WebhookURL
     $Info | Export-CSV "C:\ProgramData\ITGlueMasterimage\PassInfo.csv" -Encoding ascii -Force -NoTypeInformation -Delimiter ";"
     return
   }
@@ -256,21 +259,6 @@ Add-Type -AssemblyName System.Drawing
     Write-Host "Download Image"
     Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/EDVBV_LOGO.png" -OutFile ("$Script:InstallPath\" + "EDVBV_LOGO.png")
   }
-  function set-Shortcut{
-    param ( 
-    [string]$TargetPath, 
-    [string]$DestinationPath,
-    [string]$Arguments,
-    [string]$IconLocation 
-    )
-
-    $WshShell = New-Object -comObject WScript.Shell
-    $Shortcut = $WshShell.CreateShortcut($DestinationPath)
-    $Shortcut.TargetPath = $SourceExe
-    $Shortcut.Arguments = $Arguments
-    $Shortcut.IconLocation = $IconLocation
-    $Shortcut.Save() 
-  }
 
   function Set-BISFLink {
     if(Test-Path "$Script:InstallPath\ITGLUE_Masterimage.ps1"){
@@ -282,7 +270,11 @@ Add-Type -AssemblyName System.Drawing
     }
     if(Test-Path "C:\Program Files (x86)\Base Image Script Framework (BIS-F)"){
       write-Host "BISF exists - Creating Link"
-      set-Shortcut -TargetPath "powershell.exe" -DestinationPath "C:\Program Files (x86)\Base Image Script Framework (BIS-F)\Framework\SubCall\Preparation\Custom\Masterimage_Doku.lnk" -Arguments "& $Script:InstallPath\ITGLUE_Masterimage.ps1" -IconLocation "$Script:InstallPath\EDVBV_ICON.ico"
+      $BISFStart = @'
+      & "C:\ProgramData\ITGlueMasterimage\ITGLUE_Masterimage.ps1"
+'@
+      $BISFStart > "C:\Program Files (x86)\Base Image Script Framework (BIS-F)\Framework\SubCall\Preparation\Custom\Masterimage_Dokumentation.ps1"
+
     }
     else{
       write-Host "BISF does not exists"
