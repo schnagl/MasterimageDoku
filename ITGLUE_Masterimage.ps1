@@ -1,404 +1,463 @@
-#requires -version 5
-# Aktuell keine weiteren benötigte Module 
-
 <#
-.SYNOPSIS
-Documentation of the Changes since the Last Sealing and Upload to ITGLue per WebHook.
-.DESCRIPTION
-To upload the Changes of your Masterimage to ITGlue while sealing the Script add the Script to the Preparation-Folder.
-Please add the OrgID of the Organissation to the Script.
-
-.NOTES
-Masterimage Script
-Company: EDV-BV
-Author: Christian Schnagl 
-Creation Date: 2021-11-18
-####
-
-Changelog:
-2021-12-15    WEBHook-ULR entfernt
-2021-12-14    AutoScroll GUI + FirstRunGui hinzugefügt
-2021-12-06    WebhookURL Ausgelagert & BIS-F Script
-2021-11-25    First Run & Anpassungen Upload
-2021-11-23    Neues GUI
-2021-11-20    First Run
-2021-11-19    Speichern der Informationen
-2021-11-18    Automatische Automatisierung - Anpassung für Github
-2021-11-16    Grundsätzliche Anpassungen Script - Hinzufügen des Webhooks
-
+Zweck: IT-Glue Skript EDV-BV GmbH
+Ersteller: Christian Schnagl
 
 #>
 
-#################################################################################################################
+#Requires -Version 5.0
+##Requires IGEL UMS6
 
+### Anpassungen:
+# 20122021  CRSC    Basics
+# 20220103  CRSC    Anpassungen Upload, Eingabe
+
+# Beispiel 1:
+
+#################################################################################################################
     ########################### Option 1 - Powershell ###########################
     param(
-        #$CSV                    = $NULL,    # Global im Script
-        #$ITGlueOrgID            = $NULL    # Per CSV / Direct
+        $ITGlueOrgID    = $NULL,    # Global im Script
+        $CSV            = $NULL,    # Global im Script
+        $UMSAdress      = $NULL,    # Per CSV / Direct
+        $User           = $NULL,    # Per CSV / Abfrage Powershell
+        $Password       = $NULL     # Per CSV / Abfrage Powershell
     )
+    ########################### Option 2 - Azure Pipeline ###########################
+        if($NULL -ne ${env:ITGlueApiKEY})   {$ITGlueApiKEY  = ${env:ITGlueApiKEY}}
+        if($NULL -ne ${env:ITGlueOrgID})    {$ITGlueOrgID   = ${env:ITGlueOrgID}}
+        if($NULL -ne ${env:ORGID})          {$ITGlueOrgID   = ${env:ORGID}}
+        if($NULL -ne ${env:CSV})            {$CSV           = ${env:CSV}}
+        if($NULL -ne ${env:UMSAdress})      {$UMSAdress     = ${env:UMSAdress}}
+        if($NULL -ne ${env:User})           {$User          = ${env:User}}
+        if($NULL -ne ${env:Password})       {$Password      = ${env:Password}}
+
+    ########################### Option 3 - Abfrage ###########################
+        #Werte die nicht per CSV übergeben werden können
+        if($Null -eq $ITGlueOrgID){
+            $ITGlueOrgID = Read-Host "ITGlueOrgID"
+        }
+        #Werte die per CSV übergeben werden können
+        IF([string]::IsNullOrWhiteSpace($CSV)){
+            if($Null -eq $UMSAdress){
+                $UMSAdress = Read-Host "UMSAdress"
+            }
+            if($Null -eq $User){
+                $User = Read-Host "User"
+            }    
+            if($Null -eq $Password){
+                $securepass = Read-Host "Password" -AsSecureString
+            }        
+        }
 
 
-    ########################### Basic Infos ###########################
-    #$ITGlueOrgID = 2037545059041452
-    $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "0.84"
 
-    $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
-    $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
-    #BISFPath = ""
+    ########################### Environment beschreiben - CSV verwenden ############################>
+    IF([string]::IsNullOrWhiteSpace($CSV)){
+        #ADC - Variable befüllen wenn CSV nicht gesetzt wurde
+        $UMSs = New-Object PSCustomObject
+        $UMSs | Add-Member -type NoteProperty -name UMSAdress -Value $UMSAdress
+        $UMSs | Add-Member -type NoteProperty -name User -Value $User   
+        $UMSs | Add-Member -type NoteProperty -name Password -Value $Password
+        $UMSs | Add-Member -type NoteProperty -name securepass -Value $securepass
+    }
+    else{
+        $UMSs = Import-Csv $CSV -Delimiter ";"
+    }
+    
 
-#---------------------------------------------------------[Initialisations]--------------------------------------------------------
-#region Initialisation
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-#Variaben
-$Costumers                = $NULL
-$Script:ITGlueOrgID       = $NULL
+    ########################### ITGlue Infos ###########################
+    $APIEndpoint = "https://api.eu.itglue.com"
+    $FlexAssetName = "IGEL UMS"
 
-# Init PowerShell Gui
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
-#endregion Initialisation
-#---------------------------------------------------------[Initialisations]--------------------------------------------------------
 
-#-----------------------------------------------------------[Functions]------------------------------------------------------------
-#region Function Definition
-  function Invoke-Webhook{
+    ########################### Azure Pipeline Check ###########################
+    # Check ob Script durch Azure gestartet wurde 
+    if($NULL -ne ${env:TF_BUILD}){
+        write-host "Azure Pipeline wird verwendet"
+        $AzurePipeline = $True
+    }
+    else{
+        write-host "Azure Pipeline wird nicht verwendet"
+        $AzurePipeline = $False
+    }
+    if($NULL -ne $ITGlueApiKEY){
+        Write-Host "ITGLUE API Key ist gesetzt"
+        Write-Host "ITGLUE direkt Upload aktiviert"
+        write-host "Webhook deaktiviert"
+        $ITGlueUpload = $True
+        $WebhookUpload = $False
+    }
+    else{
+        Write-Host "ITGLUE API Key ist nicht gesetzt"
+        Write-Host "ITGLUE direkt Upload deaktiviert"
+        write-host "Webhook aktiviert"
+        $ITGlueUpload = $False
+        $WebhookUpload = $True
+    }
+
+
+
+    # TLS 1.2 Aktivieren
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+
+
+#################################################################################################################
+function Install-PSModule ($m) {
+    if (Get-Module -ListAvailable -Name $m ) {
+        Import-Module -Name $m
+        
+        Write-Host "Module "  $m " exists" -ForegroundColor green
+    } 
+    else {
+        Write-Host "Module " $m " does not exist and will be installed" -ForegroundColor yellow
+        Install-Module $m -Verbose -Scope CurrentUser -Confirm:$false -Force
+    }
+}
+    
+function Invoke-Webhook{
     param(
       $FlexAssetBody,
       $ITGlueOrgID,
       $FlexAssetName,
       $FieldName #Feldname der überprüft werden soll - z.B. Hostname
     )
-  
     Write-Host "Sending to Webhook"
+    $WebhookURL = 'https://1c526335-77da-4dac-ba6c-295357be5a2e.webhook.dewc.azure-automation.net/webhooks?token=YKai9s%2fr7%2bTXEtnW2%2faweqWZObsryFXkKdmpkHZoEXU%3d'
     $UploadJSON = ConvertTo-Json -InputObject $FlexAssetBody
     $header = @{ 
       ITGlueOrgID   = $ITGlueOrgID 
       FlexAssetName = $FlexAssetName
       FieldName    = $FieldName      
     }
-    write-host $Host
-    $response = Invoke-RestMethod -Method post -Uri $Script:WebhookURL -Body $UploadJSON -Headers $header
-  
+    $response = Invoke-RestMethod -Method post -Uri $WebhookURL -Body $UploadJSON -Headers $header
   }
-  function Get-Changes-Software{
-    $UpdatedSoftware = @()
-    $Softwares = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate 
-    $Softwarecount = 0
-    #Set-Line -Text "Installierte Software"
-  
-    foreach($Software in $Softwares){
-      if($Null -ne $Software.InstallDate){
-        $Softwaredate = $Software.InstallDate.Insert(4,"/")
-        $Softwaredate = $Softwaredate.Insert(7,"/")
-  
-        if((get-date $Softwaredate).date -ge (get-date $LastPassDate).date){
-          $Softwarecount = $Softwarecount + 1
-          #Set-Line -Text $Software.InstallDate, "-", $Software.Publisher, "|",$Software.DisplayName, $Software.DisplayVersion
-          $Updatedsoftware += $Software
-  
+function Invoke-ITGlueAPI{
+    param(
+        $ITGlueOrgID,
+        $FlexAssetName,
+        $FlexAssetBody,
+        $Fieldname
+        
+    )
+    write-host "FlexassetName $FlexAssetName"
+    write-host "ITGlueOrgID $ITGlueOrgID"
+    $Fieldvalue = $FlexAssetBody.attributes.traits.$Fieldname
+
+    $FilterID = (Get-ITGlueFlexibleAssetTypes -filter_name $FlexAssetName).data
+
+    $ExistingFlexAsset = (Get-ITGlueFlexibleAssets -filter_flexible_asset_type_id $($FilterID.ID) -filter_organization_id $ITGlueOrgID).data | Where-Object { $($_.attributes.traits.$Fieldname) -eq $($Fieldvalue)}
+    
+    #$ExistingFlexAsset.attributes.traits.psobject.Properties.name
+
+    # ITGlue Reupload
+
+    if ($ExistingFlexAsset) { 
+        $diff = compare-object $($FlexAssetBody.attributes.traits.keys) ($ExistingFlexAsset.attributes.traits.psobject.Properties.name) #Fehler in Azure
+        #$diff = compare-object $($FlexAssetBody.attributes.traits.psobject.Properties.name) ($ExistingFlexAsset.attributes.traits.psobject.Properties.name)
+        $additionalattributes = @()
+        $additionalattributes += $diff | Where-Object sideindicator -eq "=>" | Select-Object -ExpandProperty InputObject
+
+        foreach ($additionalattribute in $additionalattributes) {
+            $FlexAssetBody.attributes.traits.add("$additionalattribute", "$($ExistingFlexAsset.attributes.traits.$additionalattribute)")
         }
-      }
     }
-    if($Softwarecount -eq 0){
-      #Set-Line -Text "No Changes"
+
+    # Ende Reupload
+    #If the Asset does not exist, we edit the body to be in the form of a new asset, if not, we just upload.
+    if (!$ExistingFlexAsset) {
+        $FlexAssetBody.attributes.add('organization-id', $ITGlueOrgID)
+        $FlexAssetBody.attributes.add('flexible-asset-type-id', $($filterID.ID))
+        write-host "  Creating $FlexAssetName in IT-Glue organisation $ITGlueOrgID" 
+
+        New-ITGlueFlexibleAssets -data $FlexAssetBody
     }
-    return $UpdatedSoftware
-  }
-  function Get-Changes-Patches {
-    $Updates = Get-WmiObject win32_quickfixengineering | Select-Object InstalledOn, HotfixID, Description, InstalledBy
-    $InstalledPatches = @()
-    #Set-Line -Text "Installed Patches"
-  
-    foreach($Update in $Updates){
-      if($Null -ne $Update.InstalledOn){
-        if((get-date $Update.InstalledOn).date -ge (get-date $LastPassDate).date){
-          $Updatecount = $Updatecount +=1
-          #Set-Line -Text (Get-date $Update.InstalledOn -Format "dd.MM.yyyy"),$Update.HotFixID,$Update.Description
-          $InstalledPatches += $Update
+    else {
+        Write-Host "Updating Flexible Asset"
+        
+        $ExistingFlexAsset = $ExistingFlexAsset[-1]
+        Set-ITGlueFlexibleAssets -id $ExistingFlexAsset.id  -data $FlexAssetBody
+    }
+    return 
+
+}
+
+function get-NextDirectory{
+    param(
+        $DeviceDirectorys,
+        $ID
+    )
+
+    $UMSDeviceDirectory = Get-UMSDeviceDirectory -id $ID
+
+    if($UMSDeviceDirectory.ParentId -isnot "-1"){
+        
+
+    }
+
+    return $UMSDeviceDirectory
+
+}
+
+function InventorizeIGELUMSDevices{
+    #Funktion ausgelagert da ITGLUE Upload Limit
+    #Devices
+    write-Host "process Devices"
+    $DeviceDirectoryColl = Get-UMSDeviceDirectory 
+    $DeviceDirectorys = Get-UMSDirectoryRecursive -Id "-1" -DirectoryColl $DeviceDirectoryColl
+
+
+
+    $UMSDevices = Get-UMSDevice -Filter details
+    $UMSDeviesNew = @()
+    $DirectoryPaths = @()
+    
+
+    foreach($UMSDevice in $UMSDevices){
+
+        $UMSDeviceDirectory = Get-UMSDeviceDirectory -id $UMSDevice.ParentID -WarningAction SilentlyContinue
+
+        if($DirectoryPaths.ID -match $UMSDeviceDirectory.ID ){
+            #Ok, Directory existiert bereits
+           
+            $UMSDevice | Add-Member -MemberType NoteProperty -Name 'DirectoryString' -Value $(($DirectoryPaths | where-object {$_.ID -eq $UMSDeviceDirectory.ID}).DirectoryString)
+            #$UMSDevice | Add-Member -Name 'New Property' -Type NoteProperty -Value 23
+
+            #write-host "Extistiert"
         }
-      }
-  
-    }
-    if($Updatecount -eq 0){
-      #Set-Line -Text "No Changes"
-    }
-  
-    return $InstalledPatches
-  }
-  function Get-CustomFlexAssetBody{
-    $DateToday = Get-Date -format "yyyy-MM-dd"
-    $Hostname   = hostname
-    $Firma = $ComboBoxFirma.Text
-    $User = $TextBoxEditor.text
-    $Discussed = $TextBoxConsultant.text
-    $Ticket = $TextBoxTicket.text
-    $Comment = $TextBoxComment.text
-    $Softwares = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | ConvertTo-Html -Fragment | Out-String
-    $Updates = Get-WmiObject win32_quickfixengineering | Select-Object InstalledOn, HotfixID, Description, InstalledBy | ConvertTo-Html -Fragment | Out-String
-    $UploadSoftware = $Script:ChangesSoftware | ConvertTo-Html -Fragment | Out-String
-    $UploadPatches = $Script:ChangesPatches | ConvertTo-Html -Fragment | Out-String
-  
-    if($Null -eq $User){
-      [System.Windows.Forms.MessageBox]::Show("User Required","Missing User",[System.Windows.Forms.MessageBoxButtons]::OKCancel,[System.Windows.Forms.MessageBoxIcon]::Warning)
-    }
-    else{
-      #Vorbereitung der Daten  
-      $FlexAssetBody = @{
-        type       = 'flexible-assets'
-        attributes = @{
-            #ITGlueOrgID   = $Script:ITGlueOrgID 
-            traits = @{
-                'hostname'        = $Hostname
-                'update'          = $DateToday
-                'change-company'  = $Firma
-                'change-user'     = $User
-                'discussed'       = $Discussed
-                'ticket'          = $Ticket
-                'comment'         = $Comment
-                'softwarelist'    = $Softwares
-                'updatelist'      = $Updates
-                'changes-software'= $UploadSoftware
-                'changes-windows-patches' = $UploadPatches
+        else{
+            $ParentDirectory = $UMSDeviceDirectory 
+            $DirectoryString = $ParentDirectory.Name + "/"
+            while($ParentDirectory.ParentId -notmatch "-1")
+            {
+                $ParentDirectory = Get-UMSDeviceDirectory -id $ParentDirectory.ParentId
+                $DirectoryString = $ParentDirectory.Name + "/" + $DirectoryString 
+
+            }
+            $Directory = New-Object PSCustomObject
+            $Directory | Add-Member -type NoteProperty -name ID -Value $UMSDevice.ParentID
+            $Directory | Add-Member -type NoteProperty -name DirectoryString -Value $DirectoryString
+            $DirectoryPaths += $Directory
+            $UMSDevice | Add-Member -MemberType NoteProperty -Name 'DirectoryString' -Value $Directory.DirectoryString
+        }
+
+        
+
+        # Single Device Upload
+        <#
+        $DeviceName = $UMSDevice.Name
+        $DeviceDirectory = $UMSDevice.DirectoryString
+        $DeviceInfosTechnical = $($UMSDevice | Select-Object ProductId, DeviceType, Mac, UnitId, OsType, BiosVersion | ConvertTo-Html -Fragment | Out-String)
+        $DeviceInfosOther = $($UMSDevice | Select-Object Site, Comment, Department, CostCenter, AssetID, InServiceDate, SerialNumber | ConvertTo-Html -Fragment | Out-String)
+        $DeviceFirmware = $(Get-UMSFirmware -id $UMSDevice.FirmwareId | Select-Object Product, Version | ConvertTo-Html -Fragment | Out-String)
+        #$DeviceSystem = $($UMSDevice | Select-Object Site, Comment, Department, CostCenter, AssetID, InServiceDate, SerialNumber | ConvertTo-Html -Fragment | Out-String)
+
+
+        $FlexAssetBodyDevice = 
+        @{
+            type       = 'flexible-assets'
+            attributes = @{
+                traits = @{
+                    'name'                    = $DeviceName
+                    'directory'               = $DeviceDirectory         
+                    'technical-informations'  = $DeviceInfosTechnical         
+                    'other-informations'      = $DeviceInfosOther   
+                    'firmware'                = $DeviceFirmware     
                 }
             }
         }
-        return $FlexAssetBody
-        #$FlexAssetBody.attributes.traits
+
+        if($WebhookUpload){
+            #Invoke-Webhook -FlexAssetBody $FlexAssetBodyDevice -FlexAssetName "IGEL Device" -ITGlueOrgID $ITGlueOrgID -FieldName "name"
+            write-warning "No Device Webhook Upload"
+        }
+        elseif(!$WebhookUpload){
+            Invoke-ITGlueAPI -FlexAssetBody $FlexAssetBodyDevice -FlexAssetName "IGEL Device" -ITGlueOrgID $ITGlueOrgID -FieldName "name"
+            #Create or Update Asset in IT Glue
+        }
+
+        #>
+    
     }
-  
-  }
-  function Get-LastPassInfo{
-    If (Test-Path $LastPassInfoPath -PathType leaf) {
-      $LastPass = Import-csv $LastPassInfoPath -Delimiter ";"
+    $UMSDevicesGroups = $UMSDevices | Group-Object -Property DirectoryString | Sort-Object -Property DirectoryString
+
+    $DevicesHTML = ""
+    foreach($UMSDevicesGroup in $UMSDevicesGroups){
+        $DeviceGroupHTML = "<br>"
+        $DeviceGroupHTML += "<p><b>$($UMSDevicesGroup.Name)</b> $($UMSDevicesGroup.Group.Count) Devices</p>"
+        #$DeviceGroupHTML = "<p>In sum there are $($UMSDevicesGroup.Count) Devices</p>"
+        $DeviceGroupHTML += $($UMSDevicesGroup.Group | Select-Object Name, ProductId, DeviceType | ConvertTo-Html -Fragment | Out-String)
+        $DevicesHTML += $DeviceGroupHTML
     }
-    else{
-      $Lastpass = $NULL
+
+    #$DevicesHTML | out-file -FilePath "C:\Temp\test.htm"
+
+    $FlexAssetBodyDevices = 
+    @{
+        type       = 'flexible-assets'
+        attributes = @{
+            traits = @{
+                'hostname'              = $UMSAdress
+                'devices'               = $DevicesHTML         
+            }
+        }
     }
-  
-    return $LastPass
-  }
-  function Set-PassInfo{
-    $CurDate = Get-Date
-    $CustomersString = $Customers -join ','
-    $Info = New-Object PSCustomObject
-    $Info | Add-Member -type NoteProperty -name "ScriptVersion" -Value $ScriptVersion
-    $Info | Add-Member -type NoteProperty -name "PassDate" -Value $CurDate
-    $Info | Add-Member -type NoteProperty -name "ITGlueOrgID" -Value $Script:ITGlueOrgID
-    $Info | Add-Member -type NoteProperty -name "Customers" -Value  $CustomersString
-    $Info | Add-Member -type NoteProperty -name "WebhookURL" -Value  $Script:WebhookURL
-    $Info | Export-CSV "C:\ProgramData\ITGlueMasterimage\PassInfo.csv" -Encoding ascii -Force -NoTypeInformation -Delimiter ";"
-    return
-  }
-  function Get-NewVersion{
-    param(
-      [String]$PathExistingVersion = "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage.ps1"
-    )
-    If (Test-Path "$PSScriptRoot\MasterimageScriptUpdater.ps1" -PathType leaf) {
-      Remove-Item -Path "$PSScriptRoot\MasterimageScriptUpdater.ps1" -Force
+
+    if($WebhookUpload){
+        Invoke-Webhook -FlexAssetBody $FlexAssetBodyDevices -FlexAssetName $FlexAssetName -ITGlueOrgID $ITGlueOrgID -FieldName "hostname"
     }
-    $WebResponseVersion = Invoke-WebRequest -UseBasicParsing $PathExistingVersion
-    If (!$WebVersion) {
-        $WebVersion = (($WebResponseVersion.tostring() -split "[`r`n]" | select-string "ScriptVersion =" | Select-Object -First 1) -split "=")[1].Trim()
-        $WebVersion = $WebVersion.Replace('"','')
+    elseif($ITGlueUpload){
+        Invoke-ITGlueAPI -FlexAssetName $FlexAssetName -ITGlueOrgID $ITGlueOrgID -FlexAssetBody $FlexAssetBodyDevices -FieldName "hostname"
+        #Create or Update Asset in IT Glue
     }
-    If ($WebVersion -gt $ScriptVersion) {
-        $NewerVersion = $true
-    }
-    else{
-        $NewerVersion = $false
-    }
-  
-    If ($NewerVersion -eq $false) {
-      # No new version available
-      write-Host "Versioncheck - Version Up2Date" -ForegroundColor Green
-      Write-Output ""
-    }
-    Else {
-      # There is a new Script Version
-      write-Host "Versioncheck - New Version Available" -ForegroundColor Red
-      Write-Output ""
+
+}
+
+function InventorizeIGELUMS {
+
+    #UMS Basics
+    write-Host "process Basics"
+    $UMSStatus = Get-UMSStatus | Select-Object Server,BuildNumber,RmGuiServerVersion,DerbyVersion,ActiveMqVersion 
+    $UMSStatusHTML = $UMSStatus | ConvertTo-Html -Fragment | Out-String
+    
+    #Firmware 
+    write-Host "process Firmware"
+    $UMSFirmware = Get-UMSFirmware | select-object Product, Id, Version, FirmwareType
+    $UMSFirmwareHTML = $UMSFirmware | ConvertTo-Html -Fragment | Out-String
+
+
+    #Profiles
+    write-Host "process Profiles"
+    $UMSProfiles = Get-UMSProfile |  Select-Object Name, id, firwareid, IsMasterProfile, OverridesSessions
+    $UMSProfilesHTML = $UMSProfiles | ConvertTo-Html -Fragment | Out-String
+
+
+    #ProfileAssignments
+    write-Host "process Profile Assignments"
+    $DirectAssignments = @()
+    $DirAssignments = @()
+    foreach($UMSProfile in $UMSProfiles){
         
-      $wshell = New-Object -ComObject Wscript.Shell
-      $AnswerPending = $wshell.Popup("Do you want to download the new version?",0,"New Version Alert!",32+4)
-      If ($AnswerPending -eq "6") {
-        Invoke-ProgramParts
-          $update = @'
-              Remove-Item -Path "$PSScriptRoot\ITGLUE_Masterimage.ps1" -Force 
-              Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage.ps1" -OutFile ("$PSScriptRoot\" + "ITGLUE_Masterimage.ps1")
-              write-host "New Version downloaded"
-              & "$PSScriptRoot\ITGLUE_Masterimage.ps1"
-'@
-          $update > $PSScriptRoot\MasterimageScriptUpdater.ps1
-          write-host $PSScriptRoot
-          & "$PSScriptRoot\MasterimageScriptUpdater.ps1"
-          Break
-      }
+        $Receivers = Get-UMSProfileAssignment -Id $UMSProfile.Id
+        $DirReceivers = Get-UMSProfileAssignment -Id $($UMSProfile.Id) -Directory
+        if($NULL -ne $Receivers){
+            $DevicesString = "" 
+            foreach($Receiver in $Receivers){
+                $DevicesString += $((Get-UMSDevice -Id $Receiver.ReceiverId).Name)
+                $DevicesString += ";" 
+                
+            }
+                $DevicesString = $DevicesString.Substring("0",$DevicesString.Length -1)
+                $DirectAssignment = New-Object PSCustomObject
+                $DirectAssignment | Add-Member -type NoteProperty -name "Profile" -Value $UMSProfile.Name
+                $DirectAssignment | Add-Member -type NoteProperty -name "Devices" -Value $DevicesString
+                $DirectAssignments += $DirectAssignment
+        }   
+        if($NULL -ne $DirReceivers){
+            $DirString = "" 
+            foreach($DirReceiver in $DirReceivers){
+                $Dir = $((Get-UMSDeviceDirectory -Id $DirReceiver.ReceiverId -WarningAction SilentlyContinue).Name)
+                if($Null -ne $Dir){
+                    $DirString += $Dir
+                    $DirString += ";" 
+                }
+
+                
+            }
+                $DirString = $DirString.Substring("0",$DirString.Length -1)
+                $DirAssignment = New-Object PSCustomObject
+                $DirAssignment | Add-Member -type NoteProperty -name "Profile" -Value $UMSProfile.Name
+                $DirAssignment | Add-Member -type NoteProperty -name "Directorys" -Value $DirString
+                $DirAssignments += $DirAssignment
+        }  
+
+    }
+            
+    $DirectAssignments = $DirectAssignments |Sort-Object -Property Profile
+    $DirAssignments = $DirAssignments |Sort-Object -Property Profile 
+
+
+
+    $AssignmentsHTML = ""
+    $AssignmentsHTML += "<br>"
+    $AssignmentsHTML += "<p><b>Direct Assignments</b></p>"
+    $AssignmentsHTML += $($DirectAssignments | ConvertTo-Html -Fragment | Out-String)
+    $AssignmentsHTML += "<br>"
+    $AssignmentsHTML += "<p><b>Directory Assignments</b></p>"
+    $AssignmentsHTML += $($DirAssignments | ConvertTo-Html -Fragment | Out-String)
+    
+
+    $UMSDescription = "Automatische Documentation der Igel UMS"
+    
+    $FlexAssetBody = 
+    @{
+        type       = 'flexible-assets'
+
+
+        attributes = @{
+    
+            traits = @{
+
+                'hostname'              = $UMSAdress
+                'description'           = $UMSDescription
+                'status'                = $UMSStatusHTML   
+                'firmware'              = $UMSFirmwareHTML
+                'profiles'              = $UMSProfilesHTML
+                'profile-assignments'   = $AssignmentsHTML
+                #'devices'               = $UMSDevices         
+            }
+        }
+    }
+
+
+    #$FlexAssetBody.attributes.traits
+
+    if($WebhookUpload){
+        Invoke-Webhook -FlexAssetBody $FlexAssetBody -FlexAssetName $FlexAssetName -ITGlueOrgID $ITGlueOrgID -FieldName "hostname"
+    }
+    elseif($ITGlueUpload){
+        Invoke-ITGlueAPI -FlexAssetName $FlexAssetName -ITGlueOrgID $ITGlueOrgID -FlexAssetBody $FlexAssetBody -FieldName "hostname"
+        #Create or Update Asset in IT Glue
+    }
+}
+
+#Script Part
+
+    Install-PSModule PSIGEL
+    if($ITGlueUpload){
+        #Install Modules
+        Install-PSModule ITGlueAPI
+
+        #Connect to IT Glue API
+        Add-ITGlueBaseURI -base_uri $APIEndpoint
+        Add-ITGlueAPIKey $ITGlueApiKEY
+    }
+
+
+
+
+foreach($UMS in $UMSs){
+    $curuser = $UMS.User
+    if($NULL -eq $UMS.securepass){
+        #Wenn noch kein SecurePass wert übergeben wurde, SecurePass aus $UMS.Password erstellen
+        $curpass= $UMS.Password
+        $securepass=ConvertTo-SecureString $curpass -AsPlainText -force
+    }
+    else{
+        $securepass=$UMS.securepass
+    }
+    $cred=new-object system.management.automation.PSCredential $curuser,$securepass
+
+    $PSDefaultParameterValues = @{
+      '*-UMS*:Credential'   = $cred
+      '*-UMS*:Computername' = $UMSAdress
+    }
+
+    $PSDefaultParameterValues += @{
+      '*-UMS*:WebSession' = New-UMSAPICookie
+    }
       
-    }
-  }
-  function Invoke-ProgramParts{
-    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_GUI.ps1" -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path "$Script:InstallPath\ITGLUE_Masterimage_FirstRunGUI.ps1" -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path "$Script:InstallPath\EDVBV_ICON.ico" -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path "$Script:InstallPath\EDVBV_LOGO.png" -Force -ErrorAction SilentlyContinue
-
-    Write-Host "Creating new Directory"
-    new-item -ItemType Directory -Force -Path $Script:InstallPath     
-    #FirstRunGUI
-    Write-Host "Download FirstRunGUI"
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage_FirstRunGUI.ps1" -OutFile ("$Script:InstallPath\" + "ITGLUE_Masterimage_FirstRunGUI.ps1")  
-    #GUI
-    Write-Host "Download GUI"
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage_GUI.ps1" -OutFile ("$Script:InstallPath\" + "ITGLUE_Masterimage_GUI.ps1")
-    #Images
-    Write-Host "Download Icon"
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/EDVBV_ICON.ico" -OutFile ("$Script:InstallPath\" + "EDVBV_ICON.ico")
-    Write-Host "Download Image"
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/EDVBV_LOGO.png" -OutFile ("$Script:InstallPath\" + "EDVBV_LOGO.png")
-  }
-
-  function Set-BISFLink {
-    if(Test-Path "$Script:InstallPath\ITGLUE_Masterimage.ps1"){
-
-    }
-    else{
-      Write-Host "Adding Masterimage Script to " +$Script:InstallPath
-      Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/ITGLUE_Masterimage.ps1" -OutFile ("$Script:InstallPath\" + "ITGLUE_Masterimage.ps1")  
-    }
-    if(Test-Path "C:\Program Files (x86)\Base Image Script Framework (BIS-F)"){
-      write-Host "BISF exists - Creating Link"
-      $BISFStart = @'
-      & "C:\ProgramData\ITGlueMasterimage\ITGLUE_Masterimage.ps1"
-'@
-      $BISFStart > "C:\Program Files (x86)\Base Image Script Framework (BIS-F)\Framework\SubCall\Preparation\Custom\Masterimage_Dokumentation.ps1"
-
-    }
-    else{
-      write-Host "BISF does not exists"
-
-    }
-
-  }
-#endregion
-#--------------------------------------------------------[Functions]--------------------------------------------------------
-
-#---------------------------------------------------------[Actions]---------------------------------------------------------
-#region Action Definitions
-$ButtonSave_Click = {
-  $Script:ITGlueOrgID = $TextBoxOrgID.text
-  $Script:WebhookURL = $TextBoxWebhook.text
-  $Customers = $RichTextBoxCustomerInput.Lines
-  write-host "ORGID:" + $Script:ITGlueOrgID
-
-  $FormFirstRun.Close()
-  $FormA1.ShowDialog()
-} 
-
-$ButtonUpload_Click = {
-  $FlexassetBody = Get-CustomFlexAssetBody
-  Invoke-Webhook -FlexAssetBody $FlexAssetBody -FlexAssetName $FlexAssetName -ITGlueOrgID $Script:ITGlueOrgID -FieldName "hostname"
-  
-  $FormA1.Close()
-  Set-PassInfo
-  Set-BISFLink
+    InventorizeIGELUMS
+    InventorizeIGELUMSDevices
 }
-$ButtonCancel_Click ={
-}
-
-
-$TableLayoutPanel1_Paint = {
-}
-$FlowLayoutPanel1_Paint = {
-}
-$Label1_Click = {
-}
-$Form1_Load = {
-  $Script:ChangesSoftware = Get-Changes-Software
-  $Script:ChangesPatches = Get-Changes-Patches
-
-    ##Costumers hinzufügen
-    Foreach($Item in $Customers){
-      $Costumers += $Item
-      $ComboBoxFirma.items.add($Item)
-    }
-    #$ComboBoxFirma.SelectedItem = $Costumers[0]
-
-
-    $ListSoftware = New-Object System.collections.ArrayList
-    if (($Script:ChangesSoftware | Measure-Object).Count -eq 1){
-    $ListSoftware.Add($Script:ChangesSoftware)
-    }
-    elseif (($Script:ChangesSoftware | Measure-Object).Count -eq 0){
-        Write-Host "No Software Changed"
-        $DataGridViewSoftware.Visible = $false
-    }
-    else{
-        $ListSoftware.AddRange($Script:ChangesSoftware)
-    }
-
-    $ListPatches = New-Object System.collections.ArrayList
-    if (($Script:ChangesPatches | Measure-Object).Count -eq 1){
-      $ListPatches.Add($Script:ChangesPatches)
-    }
-    elseif (($Script:ChangesPatches | Measure-Object).Count -eq 0){
-        Write-Host "No Patches Changed"
-        $DataGridViewPatches.Visible = $false
-    }
-    else{
-        $ListPatches.AddRange($Script:ChangesPatches)
-    }
-
-    $DataGridViewSoftware.DataSource = $ListSoftware
-    $DataGridViewPatches.DataSource = $ListPatches
-
-    $DataGridViewRegistry.Visible = $false
-}
-#endregion
-#---------------------------------------------------------[Actions]---------------------------------------------------------
-
-
-#---------------------------------------------------------[Script]---------------------------------------------------------
-#region Script
-
-## Check New Version
-Get-NewVersion
-
-## Check Infos bereits gesetzt wurden
-$LastPass = Get-LastPassInfo
-if($NULL -ne $LastPass){
-  $Script:ITGlueOrgID = $LastPass.ITGlueOrgID
-  $LastPassDate = $LastPass.PassDate
-  $LastPassDate = Get-Date $LastPassDate
-  $Customers = $LastPass.Customers -split(",")
-  $Script:WebhookURL = $LastPass.WebhookURL
-}
-else{
-  Invoke-ProgramParts
-  $LastPassDate = Get-Date "01.01.1900"
-}
-
-Add-Type -AssemblyName System.Windows.Forms
-. (Join-Path $Script:InstallPath '\ITGLUE_Masterimage_GUI.ps1')
-. (Join-Path $Script:InstallPath '\ITGLUE_Masterimage_FirstRunGUI.ps1')
-
-
-$PictureBoxFirstRun.ImageLocation = $Script:InstallPath+"\EDVBV_LOGO.png" #ToDo Download
-$FormFirstRun.CancelButton        = $ButtonCancel
-$FormFirstRun.Icon                = New-Object system.drawing.icon ($Script:InstallPath+"\EDVBV_ICON.ico") #ToDo Download
-$PictureBox1.ImageLocation        = $Script:InstallPath+"\EDVBV_LOGO.png" #ToDo Download
-$FormA1.CancelButton              = $ButtonCancel
-$FormA1.Icon                      = New-Object system.drawing.icon ($Script:InstallPath+"\EDVBV_ICON.ico") #ToDo Download
-
-if($NULL -ne $LastPass){
-  ## Aufruf GUI
-  $FormA1.ShowDialog()
-}
-else{
-    ## Aufruf FirstRun
-    $FormFirstRun.ShowDialog()
-}
-#endregion 
-#---------------------------------------------------------[Script]---------------------------------------------------------
