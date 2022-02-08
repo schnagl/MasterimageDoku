@@ -16,6 +16,7 @@ Creation Date: 2021-11-16
 ####
 
 Changelog:
+2022-02-08    Upload Registry Changes Deaktiviert - Probleme Webhook
 2022-01-20    Registry Changes upload per CSV, NoGUI, Script Prozess angepasst, Bug-Fixes
 2022-01-10    Registry Checker hinzugefügt
 2021-12-15    WEBHook-ULR entfernt
@@ -161,7 +162,7 @@ Changelog:
         $Updates = Get-WmiObject win32_quickfixengineering | Select-Object HotfixID, @{name='InstalledOn';expression= {Get-Date $_.InstalledOn -format "dd.MM.yyyy"}}, Description, InstalledBy | sort-object -property InstalledOn, HotfixID | ConvertTo-Html -Fragment | Out-String
         $UploadSoftware = $Script:ChangesSoftware | ConvertTo-Html -Fragment | Out-String
         $UploadPatches = $Script:ChangesPatches | ConvertTo-Html -Fragment | Out-String
-        $UploadRegistry = $Script:ChangesRegistry
+        #$UploadRegistry = $Script:ChangesRegistry
         #$UploadRegSoftware = $Script:RegSoftware
         #$UploadRegSystem = $Script:RegSystem
         #$UploadRegNTUserDat = $Script:Regntuserdat
@@ -183,10 +184,10 @@ Changelog:
                     'updatelist'      = $Updates
                     'changes-software'= $UploadSoftware
                     'changes-windows-patches' = $UploadPatches
-                    'changes-registry'      = @{
+                    <#'changes-registry'      = @{
                         "content"   = $UploadRegistry
                         "file_name" = "RegistryChanges.csv"
-                    }
+                    }#> #0802
                     <#'changes-registry'      = @{
                         "content"   = $UploadRegSoftware
                         "file_name" = (get-date -Format "dd.MM.yyyy") +"-Software"
@@ -313,7 +314,7 @@ Changelog:
             Write-Host "Download Image"
             Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/EDVBV_LOGO.png" -OutFile ("$Script:InstallPath\" + "EDVBV_LOGO.png")
         }        
-        if(!(test-path -Path "$Script:InstallPath\RegistryChanges\")){
+        <#if(!(test-path -Path "$Script:InstallPath\RegistryChanges\")){
             #RegistryChangesView 
             write-host "Creating Folder RegistryChanges"
             mkdir "$Script:InstallPath\RegistryChanges\"
@@ -326,7 +327,7 @@ Changelog:
         if(!(test-path -Path "$Script:InstallPath\RegistryChanges\registrychangesview\RegistryChangesView.exe")){
             #RegistryChangesView
             Expand-Archive -Path ("$Script:InstallPath\" + "\RegistryChanges\registrychangesview-x64.zip") -DestinationPath ("$Script:InstallPath\RegistryChanges\" + "registrychangesview") -force
-        }
+        }#> #0802
 
     }
     function Get-FirstRegSnap {
@@ -482,7 +483,7 @@ Changelog:
     Invoke-ProgramParts
 
 #3 Alten Snapshot entfernen
-    Remove-OldRegistryKey
+    #Remove-OldRegistryKey #0802
 
 #4  Check ob LastPass gefüllt ist oder dies der erste Durchlauf ist 
     #Lastpass Infos abrufen & Check ob Script schon einmal gelaufen ist
@@ -555,10 +556,10 @@ Changelog:
     if(!$Script:BreakScript){
         if(!$DeactivateSoftware){$Script:ChangesSoftware = Get-Changes-Software}
         if(!$DeactivatePatches){$Script:ChangesPatches = Get-Changes-Patches}
-        if(!$DeactivateRegistry){
+        <#if(!$DeactivateRegistry){
             $Script:ChangesRegistry = Get-Changes-Registry
-            #Get-Registry
-        }   
+            Get-Registry
+        }#> #0802   
            
     }
 
