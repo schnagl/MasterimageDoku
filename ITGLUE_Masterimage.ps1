@@ -48,7 +48,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "1.00"
+    $ScriptVersion = "1.01"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
