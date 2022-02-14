@@ -10,13 +10,16 @@ Please add the OrgID of the Organissation to the Script.
 
 .NOTES
 Masterimage Script
-Version: 0.12
+Version: 0.20
 Company: EDV-BV
 Author: Christian Schnagl 
 Creation Date: 2021-11-18
 ####
 
 Changelog:
+2021-11-23    Neues GUI
+2021-11-20    First Run
+2021-11-19    Speichern der Informationen
 2021-11-18    Automatische Automatisierung - Anpassung für Github
 2021-11-16    Grundsätzliche Anpassungen Script - Hinzufügen des Webhooks
 
@@ -28,16 +31,17 @@ Changelog:
     ########################### Option 1 - Powershell ###########################
     param(
         #$CSV                    = $NULL,    # Global im Script
-        $ITGlueOrgID            = $NULL    # Per CSV / Direct
+        #$ITGlueOrgID            = $NULL    # Per CSV / Direct
     )
 
 
     ########################### Basic Infos ###########################
-    $ITGlueOrgID = 2037545059041452
+    #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "0.11"
+    $ScriptVersion = "0.15"
 
     
+    $LastPassInfoPath = "C:\ProgramData\ITGlueMasterimage\PassInfo.csv"
 
 #---------------------------------------------------------[Initialisations]--------------------------------------------------------
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -48,91 +52,6 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
 #-----------------------------------------------------------[Functions]------------------------------------------------------------
-<#function LoadITGlue {
-  #[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-      If (Get-Module -ListAvailable -Name "ITGlueAPI") { 
-          write-host "ITGlueAPI wird geladen." -foregroundColor green
-          Import-module ITGlueAPI 
-      }
-      Else { 
-          write-host "ITGlueAPI wird installiert und geladen." -foregroundColor green
-          Install-Module ITGlueAPI -Force #Download aus Powershell Gallery
-          Import-Module ITGlueAPI
-      }
-
-      #ITGlueVariablen definieren
-      Add-ITGlueBaseURI -base_uri $ITGbaseURI
-      Add-ITGlueAPIKey $ITGlueApiKEY
-      return
-}#>
-<#function Set-ITGLUE{
-  param (
-      $ExistingFlexAsset,
-      $ITGlueOrgID,
-      $FlexAssetBody
-  )
-
-  Write-Host "Upload ITGlue - Start"
-  # Es sollte keine Änderungen unterhalb dieser Zeile, in dieser Funktion notwendig sein.
-
-
-  # Der Upload in IT-Glue und der "Reupload" nicht veränderter Attribute sollte für alle Skripte gleich sein.
-
-  # Reupload Attribute die nicht von Skript verändert wurden
-
-  if ($ExistingFlexAsset) { 
-      $diff = compare-object $($FlexAssetBody.attributes.traits.keys) ($ExistingFlexAsset.attributes.traits.psobject.Properties.name)
-      $additionalattributes = @()
-      $additionalattributes += $diff | Where-Object sideindicator -eq "=>" | Select-Object -ExpandProperty InputObject
-
-      foreach ($additionalattribute in $additionalattributes) {
-          $FlexAssetBody.attributes.traits.add("$additionalattribute", "$($ExistingFlexAsset.attributes.traits.$additionalattribute)")
-      }
-  }
-
-  # Ende Reupload
-
-
-  #If the Asset does not exist, we edit the body to be in the form of a new asset, if not, we just upload.
-  if (!$ExistingFlexAsset) {
-      $FlexAssetBody.attributes.add('organization-id', $ITGlueOrgID)
-      $FlexAssetBody.attributes.add('flexible-asset-type-id', $($filterID.ID))
-      write-host "  Creating $FlexAssetName in IT-Glue organisation $ITGlueOrgID" 
-      New-ITGlueFlexibleAssets -data $FlexAssetBody
-  }
-  else {
-      write-host "Editing $FlexAssetName in IT-Glue organisation $ITGlueOrgID"  
-      $ExistingFlexAsset = $ExistingFlexAsset | select-object -last 1
-      Set-ITGlueFlexibleAssets -id $ExistingFlexAsset.id -data $FlexAssetBody
-  }
-
-
-  Write-Host "Upload ITGlue - End"
-}#>
-<#function Get-ITGlueFlexibleAssetCustom {
-  param (
-      [parameter(Mandatory=$False)] 
-      $AssetTypeName,        
-      [parameter(Mandatory=$False)] 
-      $Fieldname,        
-      [parameter(Mandatory=$False)] 
-      $Fieldvalue,
-      [switch]$OrganisationGlobal
-
-  )
-
-  $Organisation = @{} 
-  if(!$OrganisationGlobal){
-      $Organisation["filter_organization_id"] = $ITGlueOrgID
-  }
-
-  $MasterFlexAsset = $NULL
-  $FilterID = (Get-ITGlueFlexibleAssetTypes -filter_name $AssetTypeName).data
-  $MasterFlexAsset = (Get-ITGlueFlexibleAssets -filter_flexible_asset_type_id $($filterID.ID) @Organisation).data | Where-Object { $($_.attributes.traits.$Fieldname) -eq $($Fieldvalue)}
-
-  return $MasterFlexAsset
-}#>
 function Set-Textbox{
   param(
     $CLine,
@@ -189,14 +108,13 @@ function Set-Line{
   $Script:Line = $Script:Line + 20
   return
 }
-function Get-Changes { 
+<#function Get-Changes { 
     #$StartupDate = Get-CimInstance -ClassName win32_operatingsystem | Select-Object lastbootuptime
     $Softwares = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate 
     $Updates = Get-WmiObject win32_quickfixengineering 
     $Updatedsoftware = @()
     $Softwarecount = 0
     $Updatecount = 0
-    $LastUpload = Get-Sealingdate
 
 
     $Script:Line = 310
@@ -208,7 +126,7 @@ function Get-Changes {
         $Softwaredate = $Software.InstallDate.Insert(4,"/")
         $Softwaredate = $Softwaredate.Insert(7,"/")
 
-        if((get-date $Softwaredate).date -ge (get-date $LastUpload).date){
+        if((get-date $Softwaredate).date -ge (get-date $LastPassDate).date){
           $Softwarecount = $Softwarecount + 1
           Set-Line -Text $Software.InstallDate, "-", $Software.Publisher, "|",$Software.DisplayName, $Software.DisplayVersion
           $Updatedsoftware += $Software
@@ -224,7 +142,7 @@ function Get-Changes {
     Set-Line -Text "Installed Patches"
   
     foreach($Update in $Updates){
-      if((get-date $Update.InstalledOn).date -ge (get-date $LastUpload).date){
+      if((get-date $Update.InstalledOn).date -ge (get-date $LastPassDate).date){
         $Updatecount = $Updatecount +=1
         Set-Line -Text (Get-date $Update.InstalledOn -Format "dd.MM.yyyy"),$Update.HotFixID,$Update.Description
       }
@@ -235,20 +153,19 @@ function Get-Changes {
 
 
 
-}
+}#>
 function Get-Changes-Software{
   $UpdatedSoftware = @()
   $Softwares = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate 
   $Softwarecount = 0
   #Set-Line -Text "Installierte Software"
-  $LastUpload = Get-Sealingdate
 
   foreach($Software in $Softwares){
     if($Null -ne $Software.InstallDate){
       $Softwaredate = $Software.InstallDate.Insert(4,"/")
       $Softwaredate = $Softwaredate.Insert(7,"/")
 
-      if((get-date $Softwaredate).date -ge (get-date $LastUpload).date){
+      if((get-date $Softwaredate).date -ge (get-date $LastPassDate).date){
         $Softwarecount = $Softwarecount + 1
         #Set-Line -Text $Software.InstallDate, "-", $Software.Publisher, "|",$Software.DisplayName, $Software.DisplayVersion
         $Updatedsoftware += $Software
@@ -265,11 +182,10 @@ function Get-Changes-Patches {
   $Updates = Get-WmiObject win32_quickfixengineering | Select-Object InstalledOn, HotfixID, Description, InstalledBy
   $InstalledPatches = @()
   Set-Line -Text "Installed Patches"
-  $LastUpload = Get-Sealingdate
 
   foreach($Update in $Updates){
     if($Null -ne $Update.InstalledOn){
-      if((get-date $Update.InstalledOn).date -ge (get-date $LastUpload).date){
+      if((get-date $Update.InstalledOn).date -ge (get-date $LastPassDate).date){
         $Updatecount = $Updatecount +=1
         #Set-Line -Text (Get-date $Update.InstalledOn -Format "dd.MM.yyyy"),$Update.HotFixID,$Update.Description
         $InstalledPatches += $Update
@@ -337,30 +253,47 @@ function Get-CustomFlexAssetBody{
       Invoke-Webhook -FlexAssetBody $FlexAssetBody -FlexAssetName $FlexAssetName -ITGlueOrgID $ITGlueOrgID
       #Set-ITGLUE    $ExistingFlexAsset -ITGlueOrgID $ITGlueOrgID -FlexAssetBody $FlexAssetBody
       $Form.Close()
+      Set-PassInfo
   }
 
 }
-function Get-Sealingdate{
-  $Date = Get-Date "2021-11-01"
-  return $Date
+function Get-LastPassInfo{
+  If (Test-Path $LastPassInfoPath -PathType leaf) {
+    $LastPass = Import-csv $LastPassInfoPath -Delimiter ";"
+  }
+  else{
+    $Lastpass = $NULL
+  }
+
+  return $LastPass
 }
 
-function Set-SealingDate{
+function Set-PassInfo{
   $CurDate = Get-Date
-  [Environment]::SetEnvironmentVariable("Sealingdate", $CurDate, "User")
-  $Env:SealingDate
+  $Info = New-Object PSCustomObject
+  $Info | Add-Member -type NoteProperty -name "ScriptVersion" -Value $ScriptVersion
+  $Info | Add-Member -type NoteProperty -name "PassDate" -Value $CurDate
+  $Info | Add-Member -type NoteProperty -name "ITGlueOrgID" -Value $ITGlueOrgID
+  $Info | Export-CSV "C:\ProgramData\ITGlueMasterimage\PassInfo.csv" -Encoding ascii -Force -NoTypeInformation -Delimiter ";"
+  return
 }
 
 function Get-NewVersion{
   param(
     [String]$PathExistingVersion = "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/Masterimage_Update.ps1"
   )
+  If (Test-Path "$PSScriptRoot\MasterimageScriptUpdater.ps1" -PathType leaf) {
+    Remove-Item -Path "$PSScriptRoot\MasterimageScriptUpdater.ps1" -Force
+  }
   $WebResponseVersion = Invoke-WebRequest -UseBasicParsing $PathExistingVersion
   If (!$WebVersion) {
       $WebVersion = (($WebResponseVersion.tostring() -split "[`r`n]" | select-string "Version:" | Select-Object -First 1) -split ":")[1].Trim()
   }
   If ($WebVersion -gt $ScriptVersion) {
       $NewerVersion = $true
+  }
+  else{
+      $NewerVersion = $false
   }
 
   If ($NewerVersion -eq $false) {
@@ -378,10 +311,12 @@ function Get-NewVersion{
     If ($AnswerPending -eq "6") {
         $update = @'
             Remove-Item -Path "$PSScriptRoot\Masterimage_Update.ps1" -Force 
-            Invoke-WebRequest -Uri $PathExistingVersion -OutFile ("$PSScriptRoot\" + "Masterimage_Update.ps1")
+            Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Schnagl/MasterimageDoku/main/Masterimage_Update.ps1" -OutFile ("$PSScriptRoot\" + "Masterimage_Update.ps1")
+            write-host "New Version downloaded"
             & "$PSScriptRoot\Masterimage_Update.ps1"
 '@
         $update > $PSScriptRoot\MasterimageScriptUpdater.ps1
+        write-host $PSScriptRoot
         & "$PSScriptRoot\MasterimageScriptUpdater.ps1"
         Break
     }
@@ -390,32 +325,16 @@ function Get-NewVersion{
 }
 
 
+
 #--------------------------------------------------------[Script Load]--------------------------------------------------------
 #region Script Load
 #LoadITGlue
 $Hostname = Hostname
 
-  #$ExistingFlexAsset = Get-ITGlueFlexibleAssetCustom -AssetTypeName $FlexAssetName -Fieldname "Name" -Fieldvalue $Hostname
-  <#
-  if($Null -ne $ExistingFlexAsset){
-    if ($Null -ne $ExistingFlexAsset.attributes.traits.'update') {
-      $LastUpload = get-date $ExistingFlexAsset.attributes.traits.'update'
-    }
-    else{
-      write-host "First ITGlue Upload"
-      $LastUpload = Get-Date "01.01.1900"
-    }
-  }
-  else
-  {
-    write-host "First ITGlue Upload"
-    $LastUpload = Get-Date "01.01.1900"
-  }
-  #>
+
 #endregion
 #---------------------------------------------------------[Form]--------------------------------------------------------
 #region Forms
-[System.Windows.Forms.Application]::EnableVisualStyles()
 
 $Form                    = New-Object system.Windows.Forms.Form
 $Form.ClientSize         = '500,800'
@@ -550,7 +469,7 @@ $ListPatches = New-Object System.collections.ArrayList
 if (($Script:ChangesSoftware | Measure-Object).Count -eq 1){
   $ListPatches.Add($Script:ChangesPatches)
 }
-elseif (($Script:ChangesSoftware | Measure-Object).Count -eq 0){
+elseif (($Script:ChangesPatches | Measure-Object).Count -eq 0){
   $ListPatches.Add($Script:ChangesPatches)
 }
 else{
@@ -573,4 +492,33 @@ $form.Controls.Add($GridViewPatches)
 #---------------------------------------------------------[Script Write]--------------------------------------------------------
 
 
+
+
+Get-NewVersion
+$LastPass = Get-LastPassInfo
+if($NULL -ne $LastPass){
+  $LastPassDate = $LastPass.PassDate
+  $LastPassDate = Get-Date $LastPassDate
+}
+else{
+  $LastPassDate = Get-Date "01.01.1900"
+}
+if($Null -ne $LastPass.ITGlueOrgID){
+  $ITGlueOrgID = $Lastpass.ITGlueOrgID
+
+}
+else{
+  $ITGlueOrgID = Read-Host -Prompt "ITGlue OrgID benötigt"
+}
+
 [void]$Form.ShowDialog()
+
+new-item -ItemType Directory -Force -Path "C:\ProgramData\ITGlueMasterimage" 
+
+
+
+# Test 
+#$RegistrySoftware = Get-ChildItem HKLM:\SOFTWARE -Recurse -ErrorAction SilentlyContinue
+#$RegistrySoftware += Get-ChildItem HKLM:\SYSTEM -Recurse -ErrorAction SilentlyContinue
+#reg export
+# Registry Compare?

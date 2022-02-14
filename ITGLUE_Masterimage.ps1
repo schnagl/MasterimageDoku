@@ -48,7 +48,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "1.01"
+    $ScriptVersion = "1.02"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
@@ -92,7 +92,6 @@ Changelog:
         $response = Invoke-RestMethod -Method post -Uri $Script:WebhookURL -Body $UploadJSON -Headers $header
     
     }
-
     function Get-Changes-Software{
         $UpdatedSoftware = @()
         $Softwares = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate 
@@ -100,9 +99,11 @@ Changelog:
         #Set-Line -Text "Installierte Software"
     
         foreach($Software in $Softwares){
+            $Softwaredate = $NULL
+
         if($Null -ne $Software.InstallDate){
-            $Softwaredate = [DateTime]::ParseExact($Software.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")
-    
+            $Softwaredate = [DateTime]::ParseExact($Software.InstallDate, "yyyyMMdd", $null)
+                
             if((get-date $Softwaredate).date -ge (get-date $LastPassDate).date){
             $Softwarecount = $Softwarecount + 1
             #Set-Line -Text $Software.InstallDate, "-", $Software.Publisher, "|",$Software.DisplayName, $Software.DisplayVersion
@@ -497,7 +498,7 @@ Changelog:
 
     #FirstRunCheck
     if($FirstRun){
-        Get-FirstRegSnap
+        #Get-FirstRegSnap
         $LastPassDate = Get-Date "01.01.1900"
     }
     else{
