@@ -16,6 +16,7 @@ Creation Date: 2021-11-16
 ####
 
 Changelog:
+2022-03-30    Erweiterung der Softwareansicht
 2022-02-08    Upload Registry Changes Deaktiviert - Probleme Webhook
 2022-01-20    Registry Changes upload per CSV, NoGUI, Script Prozess angepasst, Bug-Fixes
 2022-01-10    Registry Checker hinzugefügt
@@ -48,7 +49,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "1.02"
+    $ScriptVersion = "1.03"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
@@ -94,7 +95,8 @@ Changelog:
     }
     function Get-Changes-Software{
         $UpdatedSoftware = @()
-        $Softwares = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate 
+        $Softwares = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
+        $Softwares += Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
         $Softwarecount = 0
         #Set-Line -Text "Installierte Software"
     
@@ -159,7 +161,10 @@ Changelog:
         $DateToday = Get-Date -format "yyyy-MM-dd"
         $Hostname   = hostname
 
-        $Softwares = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher | sort-object -property DisplayName,InstalledOn | ConvertTo-Html -Fragment | Out-String
+        $Softwares = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher 
+        $Softwares += Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher  
+        $Softwares = $Softwares | sort-object -property DisplayName,InstalledOn | ConvertTo-Html -Fragment | Out-String
+
         $Updates = Get-WmiObject win32_quickfixengineering | Select-Object HotfixID, @{name='InstalledOn';expression= {Get-Date $_.InstalledOn -format "dd.MM.yyyy"}}, Description, InstalledBy | sort-object -property InstalledOn, HotfixID | ConvertTo-Html -Fragment | Out-String
         $UploadSoftware = $Script:ChangesSoftware | ConvertTo-Html -Fragment | Out-String
         $UploadPatches = $Script:ChangesPatches | ConvertTo-Html -Fragment | Out-String
