@@ -10,12 +10,15 @@ Please add the OrgID of the Organissation to the Script.
 
 .NOTES
 Masterimage Script
-Company: EDV-BV
-Author: Christian Schnagl 
-Creation Date: 2021-11-16
+Company:            EDV-BV
+Author:             Christian Schnagl 
+Creation Date:      2021-11-16
+Version:            1.04
+
 ####
 
 Changelog:
+2022-05-05    Dokumentation Grundlegender Infos / Bugfix(Fehler bei Softwaredate)  
 2022-03-30    Erweiterung der Softwareansicht
 2022-02-08    Upload Registry Changes Deaktiviert - Probleme Webhook
 2022-01-20    Registry Changes upload per CSV, NoGUI, Script Prozess angepasst, Bug-Fixes
@@ -49,7 +52,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "1.03"
+    $ScriptVersion = "1.04"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
@@ -93,6 +96,7 @@ Changelog:
         $response = Invoke-RestMethod -Method post -Uri $Script:WebhookURL -Body $UploadJSON -Headers $header
     
     }
+
     function Get-Changes-Software{
         $UpdatedSoftware = @()
         $Softwares = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
@@ -104,14 +108,19 @@ Changelog:
             $Softwaredate = $NULL
 
         if($Null -ne $Software.InstallDate){
-            $Softwaredate = [DateTime]::ParseExact($Software.InstallDate, "yyyyMMdd", $null)
+            try{
+                $Softwaredate = [DateTime]::ParseExact($Software.InstallDate, "yyyyMMdd", $null)
                 
-            if((get-date $Softwaredate).date -ge (get-date $LastPassDate).date){
-            $Softwarecount = $Softwarecount + 1
-            #Set-Line -Text $Software.InstallDate, "-", $Software.Publisher, "|",$Software.DisplayName, $Software.DisplayVersion
-            $Updatedsoftware += $Software
-    
+                if((get-date $Softwaredate).date -ge (get-date $LastPassDate).date){
+                    $Softwarecount = $Softwarecount + 1
+                    #Set-Line -Text $Software.InstallDate, "-", $Software.Publisher, "|",$Software.DisplayName, $Software.DisplayVersion
+                    $Updatedsoftware += $Software
+                }
             }
+            catch{
+                write-warning "Issue receiving softwaredate - Software is not able to use the same format as everyone else - $Software.DisplayName"
+            }
+
         }
         }
         if($Softwarecount -eq 0){
@@ -160,6 +169,18 @@ Changelog:
         }
         $DateToday = Get-Date -format "yyyy-MM-dd"
         $Hostname   = hostname
+        $Computerinfos = Get-ComputerInfo
+        $Baselanguage       = $Computerinfos.OSLanguage
+        $MUILanguages       = $Computerinfos.OSMuilanguages -join ", "
+        $Architecture       = $Computerinfos.OsArchitecture                                          
+        $OSName             = $Computerinfos.OsName 
+        $InstallationType   = $Computerinfos.WindowsInstallationType
+        $WindowsVersion     = $Computerinfos.OSDisplayVersion
+        $Domain             = $Computerinfos.CsDomain
+        $Modell             = $Computerinfos.CsModel
+        $Installdate        = $Computerinfos.WindowsInstallDateFromRegistry #ToDo Convert
+        
+
 
         $Softwares = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher 
         $Softwares += Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher  
@@ -190,6 +211,15 @@ Changelog:
                     'updatelist'      = $Updates
                     'changes-software'= $UploadSoftware
                     'changes-windows-patches' = $UploadPatches
+                    'base-language'   = $Baselanguage
+                    'mui-languages'   = $MUILanguages                
+                    'architecture'    = $Architecture         
+                    'os-name'         = $OSName     
+                    'installation-type' = $InstallationType
+                    'windows-version' = $WindowsVersion               
+                    'domain'          = $Domain                 
+                    'system'          = $Modell
+                    'install-date'    = $Installdate                  
                     <#'changes-registry'      = @{
                         "content"   = $UploadRegistry
                         "file_name" = "RegistryChanges.csv"
@@ -591,8 +621,3 @@ Changelog:
             $FormA1.ShowDialog()
         }
     }
-
-    
-        
-
-
