@@ -13,11 +13,12 @@ Masterimage Script
 Company:            EDV-BV
 Author:             Christian Schnagl 
 Creation Date:      2021-11-16
-Version:            1.04
+Version:            1.05
 
 ####
 
 Changelog:
+2022-05-19    Anpassen Fehlermeldung falsches Datum  
 2022-05-05    Dokumentation Grundlegender Infos / Bugfix(Fehler bei Softwaredate)  
 2022-03-30    Erweiterung der Softwareansicht
 2022-02-08    Upload Registry Changes Deaktiviert - Probleme Webhook
@@ -52,7 +53,7 @@ Changelog:
     ########################### Basic Infos ###########################
     #$ITGlueOrgID = 2037545059041452
     $FlexAssetName = "Masterimage" # Name des Assets das Angelegt werden soll
-    $ScriptVersion = "1.04"
+    $ScriptVersion = "1.05"
 
     $Script:InstallPath = "C:\ProgramData\ITGlueMasterimage"
     $LastPassInfoPath = $Script:InstallPath + "\PassInfo.csv"
@@ -118,7 +119,7 @@ Changelog:
                 }
             }
             catch{
-                write-warning "Issue receiving softwaredate - Software is not able to use the same format as everyone else - $Software.DisplayName"
+                write-verbose "Issue receiving softwaredate - Unknown Dateformat - $Software.DisplayName"
             }
 
         }
@@ -621,3 +622,6 @@ Changelog:
             $FormA1.ShowDialog()
         }
     }
+
+    
+     
