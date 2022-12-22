@@ -13,11 +13,12 @@ Masterimage Script
 Company:            EDV-BV
 Author:             Christian Schnagl 
 Creation Date:      2021-11-16
-Version:            1.05
+Version:            1.06
 
 ####
 
 Changelog:
+2022-12-22    Hinzufügen Treiberdokumentation
 2022-05-19    Anpassen Fehlermeldung falsches Datum  
 2022-05-05    Dokumentation Grundlegender Infos / Bugfix(Fehler bei Softwaredate)  
 2022-03-30    Erweiterung der Softwareansicht
@@ -190,6 +191,10 @@ Changelog:
         $Updates = Get-WmiObject win32_quickfixengineering | Select-Object HotfixID, @{name='InstalledOn';expression= {Get-Date $_.InstalledOn -format "dd.MM.yyyy"}}, Description, InstalledBy | sort-object -property InstalledOn, HotfixID | ConvertTo-Html -Fragment | Out-String
         $UploadSoftware = $Script:ChangesSoftware | ConvertTo-Html -Fragment | Out-String
         $UploadPatches = $Script:ChangesPatches | ConvertTo-Html -Fragment | Out-String
+
+        $Drivers = Get-WmiObject Win32_PnPSignedDriver| where-object {$null -ne $_.DeviceName} | Select-Object Manufacturer, DeviceName, FriendlyName, InfName, ClassGuid, DriverVersion | sort-object Manufacturer | ConvertTo-Html -Fragment | Out-String
+
+
         #$UploadRegistry = $Script:ChangesRegistry
         #$UploadRegSoftware = $Script:RegSoftware
         #$UploadRegSystem = $Script:RegSystem
@@ -210,6 +215,7 @@ Changelog:
                     'comment'         = $Comment
                     'softwarelist'    = $Softwares
                     'updatelist'      = $Updates
+                    'driverlist'      = $Drivers
                     'changes-software'= $UploadSoftware
                     'changes-windows-patches' = $UploadPatches
                     'base-language'   = $Baselanguage
