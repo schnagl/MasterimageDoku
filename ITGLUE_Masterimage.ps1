@@ -6,33 +6,38 @@
 Documentation of the Changes since the Last Sealing and Upload to ITGLue per WebHook.
 .DESCRIPTION
 To upload the Changes of your Masterimage to ITGlue while sealing the Script add the Script to the Preparation-Folder.
-Please add the OrgID of the Organissation to the Script.
+Please add the OrgID of the Organisation to the Script.
+
+#
+INFO: If the Script needs more than a minute to run the script use -DeactivatePatches 
+#
 
 .NOTES
 Masterimage Script
 Company:            EDV-BV
 Author:             Christian Schnagl 
 Creation Date:      2021-11-16
-Version:            1.05
+Version:            1.06
 
 ####
 
 Changelog:
-2022-05-19    Anpassen Fehlermeldung falsches Datum  
-2022-05-05    Dokumentation Grundlegender Infos / Bugfix(Fehler bei Softwaredate)  
-2022-03-30    Erweiterung der Softwareansicht
-2022-02-08    Upload Registry Changes Deaktiviert - Probleme Webhook
-2022-01-20    Registry Changes upload per CSV, NoGUI, Script Prozess angepasst, Bug-Fixes
-2022-01-10    Registry Checker hinzugefügt
-2021-12-15    WEBHook-ULR entfernt
-2021-12-14    AutoScroll GUI + FirstRunGui hinzugefügt
-2021-12-06    WebhookURL Ausgelagert & BIS-F Script
-2021-11-25    First Run & Anpassungen Upload
-2021-11-23    Neues GUI
-2021-11-20    First Run
-2021-11-19    Speichern der Informationen
-2021-11-18    Automatische Automatisierung - Anpassung für Github
-2021-11-16    Grundsätzliche Anpassungen Script - Hinzufügen des Webhooks
+2023-08-03  Optimierung Zeitablauf
+2022-05-19  Anpassen Fehlermeldung falsches Datum  
+2022-05-05  Dokumentation Grundlegender Infos / Bugfix(Fehler bei Softwaredate)  
+2022-03-30  Erweiterung der Softwareansicht
+2022-02-08  Upload Registry Changes Deaktiviert - Probleme Webhook
+2022-01-20  Registry Changes upload per CSV, NoGUI, Script Prozess angepasst, Bug-Fixes
+2022-01-10  Registry Checker hinzugefügt
+2021-12-15  WEBHook-ULR entfernt
+2021-12-14  AutoScroll GUI + FirstRunGui hinzugefügt
+2021-12-06  WebhookURL Ausgelagert & BIS-F Script
+2021-11-25  First Run & Anpassungen Upload
+2021-11-23  Neues GUI
+2021-11-20  First Run
+2021-11-19  Speichern der Informationen
+2021-11-18  Automatische Automatisierung - Anpassung für Github
+2021-11-16  Grundsätzliche Anpassungen Script - Hinzufügen des Webhooks
 #>
 
 #################################################################################################################
@@ -98,10 +103,15 @@ Changelog:
     
     }
 
+
     function Get-Changes-Software{
+        param(
+            $AllSoftware
+        )
         $UpdatedSoftware = @()
-        $Softwares = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
-        $Softwares += Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
+
+
+        $Softwares = $AllSoftware | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate
         $Softwarecount = 0
         #Set-Line -Text "Installierte Software"
     
@@ -132,7 +142,11 @@ Changelog:
         return $UpdatedSoftware
     }
     function Get-Changes-Patches {
-        $Updates = Get-WmiObject win32_quickfixengineering | Select-Object InstalledOn, HotfixID, Description, InstalledBy
+        param(
+            $AllPatches
+        )
+
+        $Updates = $AllPatches
         $InstalledPatches = @()
         #Set-Line -Text "Installed Patches"
     
@@ -154,6 +168,11 @@ Changelog:
         return $InstalledPatches
     }
     function Get-CustomFlexAssetBody{
+        param(
+            $AllSoftware,
+            $AllPatches
+        )
+
         if(!$DeactivateGUI){
             $Firma = $ComboBoxFirma.Text
             $User = $TextBoxEditor.text
@@ -168,26 +187,49 @@ Changelog:
             $Ticket = ""
             $Comment = "No GUI Upload"
         }
+
         $DateToday = Get-Date -format "yyyy-MM-dd"
         $Hostname   = hostname
-        $Computerinfos = Get-ComputerInfo
-        $Baselanguage       = $Computerinfos.OSLanguage
-        $MUILanguages       = $Computerinfos.OSMuilanguages -join ", "
-        $Architecture       = $Computerinfos.OsArchitecture                                          
-        $OSName             = $Computerinfos.OsName 
-        $InstallationType   = $Computerinfos.WindowsInstallationType
-        $WindowsVersion     = $Computerinfos.OSDisplayVersion
-        $Domain             = $Computerinfos.CsDomain
-        $Modell             = $Computerinfos.CsModel
-        $Installdate        = $Computerinfos.WindowsInstallDateFromRegistry #ToDo Convert
+
+        # Get information about the operating system
+        $OperatingSystem = Get-CimInstance Win32_OperatingSystem
+
+        $Baselanguage     = $OperatingSystem.OSLanguage
+        $MUILanguages     = $OperatingSystem.MUILanguages -join ", "
+        $Architecture     = $OperatingSystem.OSArchitecture
+        $OSName           = $OperatingSystem.Caption
+        $WindowsVersion   = $OperatingSystem.Version
+
+        # Convert installation date
+        $InstallDateStr = $OperatingSystem.InstallDate
+        $InstallDate = Get-Date -Date $InstallDateStr -Format "yyyy-MM-dd"
+
+
+
+        # Get information about the computer
+        $ComputerSystem = Get-CimInstance Win32_ComputerSystem
+
+        $Domain           = $ComputerSystem.Domain
+        $Model            = $ComputerSystem.Model
+        $Hostname         = $ComputerSystem.Name
+
+
+        # Output the information
+        Write-Host "Hostname:        $Hostname"
+        Write-Host "Base Language:   $Baselanguage"
+        Write-Host "MUI Languages:   $MUILanguages"
+        Write-Host "Architecture:    $Architecture"
+        Write-Host "OS Name:         $OSName"
+        Write-Host "Windows Version: $WindowsVersion"
+        Write-Host "Domain:          $Domain"
+        Write-Host "Model:           $Model"
+        Write-Host "Install Date:    $InstallDate"
         
 
-
-        $Softwares = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher 
-        $Softwares += Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher  
+        $Softwares = $AllSoftware | Select-Object DisplayName, @{name='InstalledOn';expression= {[DateTime]::ParseExact($_.InstallDate, "yyyyMMdd", $null).ToString("dd.MM.yyyy")}}, DisplayVersion, Publisher 
         $Softwares = $Softwares | sort-object -property DisplayName,InstalledOn | ConvertTo-Html -Fragment | Out-String
 
-        $Updates = Get-WmiObject win32_quickfixengineering | Select-Object HotfixID, @{name='InstalledOn';expression= {Get-Date $_.InstalledOn -format "dd.MM.yyyy"}}, Description, InstalledBy | sort-object -property InstalledOn, HotfixID | ConvertTo-Html -Fragment | Out-String
+        $Updates = $AllPatches | Select-Object HotfixID, @{name='InstalledOn';expression= {Get-Date $_.InstalledOn -format "dd.MM.yyyy"}}, Description, InstalledBy | sort-object -property InstalledOn, HotfixID | ConvertTo-Html -Fragment | Out-String
         $UploadSoftware = $Script:ChangesSoftware | ConvertTo-Html -Fragment | Out-String
         $UploadPatches = $Script:ChangesPatches | ConvertTo-Html -Fragment | Out-String
         #$UploadRegistry = $Script:ChangesRegistry
@@ -477,7 +519,7 @@ Changelog:
         #$FormA1.ShowDialog()
     } 
     $ButtonUpload_Click = {
-        $FlexassetBody = Get-CustomFlexAssetBody
+        $FlexassetBody = Get-CustomFlexAssetBody -AllSoftware $AllSoftware -AllPatches $AllPatches
         Invoke-Webhook -FlexAssetBody $FlexAssetBody -FlexAssetName $FlexAssetName -ITGlueOrgID $Script:ITGlueOrgID -FieldName "hostname"
     
         $FormA1.Close()
@@ -591,8 +633,15 @@ Changelog:
 
 #7 Document Changes 
     if(!$Script:BreakScript){
-        if(!$DeactivateSoftware){$Script:ChangesSoftware = Get-Changes-Software}
-        if(!$DeactivatePatches){$Script:ChangesPatches = Get-Changes-Patches}
+        if(!$DeactivateSoftware){
+            $AllSoftware = Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} 
+            $AllSoftware += Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | where-object{$NULL -ne $_.Displayname} 
+            $Script:ChangesSoftware = Get-Changes-Software -AllSoftware $AllSoftware
+        }
+        if(!$DeactivatePatches){
+            $AllPatches = Get-WmiObject win32_quickfixengineering | Select-Object InstalledOn, HotfixID, Description, InstalledBy
+            $Script:ChangesPatches = Get-Changes-Patches -AllPatches $AllPatches
+        }
         <#if(!$DeactivateRegistry){
             $Script:ChangesRegistry = Get-Changes-Registry
             Get-Registry
@@ -606,7 +655,7 @@ Changelog:
         if($DeactivateGUI){
             #GUI Deaktiviert
             write-host "GUI deactivated - MainTask"
-            $FlexassetBody = Get-CustomFlexAssetBody
+            $FlexassetBody = Get-CustomFlexAssetBody -AllSoftware $AllSoftware -AllPatches $AllPatches
             Invoke-Webhook -FlexAssetBody $FlexAssetBody -FlexAssetName $FlexAssetName -ITGlueOrgID $Script:ITGlueOrgID -FieldName "hostname"
             
             Set-PassInfo
